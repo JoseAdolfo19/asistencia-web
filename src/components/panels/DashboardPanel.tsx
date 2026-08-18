@@ -17,13 +17,14 @@ import {
 } from "recharts";
 
 type EstadoCount = { estado: string; total: number };
-type PorCurso = { curso: string; Presente: number; Tardanza: number; Falta: number };
-type PorDia = { fecha: string; Presente: number; Tardanza: number; Falta: number };
+type PorCurso = { curso: string; Presente: number; Tardanza: number; Falta: number; Justificada: number };
+type PorDia = { fecha: string; Presente: number; Tardanza: number; Falta: number; Justificada: number };
 
 const COLORES: Record<string, string> = {
   Presente: "#16a34a",
   Tardanza: "#f59e0b",
   Falta: "#dc2626",
+  Justificada: "#94a3b8",
 };
 
 export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boolean; alumnoId: string }) {
@@ -38,7 +39,7 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
     const queryMultas = esAlumno ? supabase.from("multas").select("*").eq("alumno", alumnoId) : supabase.from("multas").select("*");
 
     Promise.all([query, queryMultas]).then(([{ data: asis }, { data: ms }]) => {
-      const regs = (asis ?? []) as { fecha: string; curso: string; estado: string }[];
+      const regs = (asis ?? []) as { fecha: string; curso: string; estado: string; justificada?: boolean }[];
       const filasMultas = (ms ?? []) as { estado: string; monto: number }[];
 
       // Estado hoy
@@ -46,15 +47,17 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
       const hoyRegs = regs.filter((r) => r.fecha === hoy);
       const contar = (arr: typeof hoyRegs) =>
         ["Presente", "Tardanza", "Falta"]
-          .map((estado) => ({ estado, total: arr.filter((r) => r.estado === estado).length }))
+          .map((estado) => ({ estado, total: arr.filter((r) => r.estado === estado && !r.justificada).length }))
           .filter((c) => c.total > 0);
-      setEstadoHoy(contar(hoyRegs));
+      const justHoy = hoyRegs.filter((r) => r.justificada).length;
+      setEstadoHoy([...contar(hoyRegs), ...(justHoy > 0 ? [{ estado: "Justificada", total: justHoy }] : [])]);
 
       // Por curso (todos los registros)
-      const porCursoMap = new Map<string, { Presente: number; Tardanza: number; Falta: number }>();
+      const porCursoMap = new Map<string, { Presente: number; Tardanza: number; Falta: number; Justificada: number }>();
       for (const r of regs) {
-        const c = porCursoMap.get(r.curso) ?? { Presente: 0, Tardanza: 0, Falta: 0 };
-        if (r.estado === "Presente") c.Presente++;
+        const c = porCursoMap.get(r.curso) ?? { Presente: 0, Tardanza: 0, Falta: 0, Justificada: 0 };
+        if (r.justificada) c.Justificada++;
+        else if (r.estado === "Presente") c.Presente++;
         else if (r.estado === "Tardanza") c.Tardanza++;
         else if (r.estado === "Falta") c.Falta++;
         porCursoMap.set(r.curso, c);
@@ -69,9 +72,10 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
           const delDia = regs.filter((r) => r.fecha === fecha);
           return {
             fecha: fecha.slice(5),
-            Presente: delDia.filter((r) => r.estado === "Presente").length,
-            Tardanza: delDia.filter((r) => r.estado === "Tardanza").length,
-            Falta: delDia.filter((r) => r.estado === "Falta").length,
+            Presente: delDia.filter((r) => r.estado === "Presente" && !r.justificada).length,
+            Tardanza: delDia.filter((r) => r.estado === "Tardanza" && !r.justificada).length,
+            Falta: delDia.filter((r) => r.estado === "Falta" && !r.justificada).length,
+            Justificada: delDia.filter((r) => r.justificada).length,
           };
         })
       );
@@ -162,6 +166,7 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
                     <Bar dataKey="Presente" stackId="a" fill={COLORES.Presente} />
                     <Bar dataKey="Tardanza" stackId="a" fill={COLORES.Tardanza} />
                     <Bar dataKey="Falta" stackId="a" fill={COLORES.Falta} />
+                    <Bar dataKey="Justificada" stackId="a" fill={COLORES.Justificada} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -184,6 +189,7 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
                     <Bar dataKey="Presente" stackId="a" fill={COLORES.Presente} />
                     <Bar dataKey="Tardanza" stackId="a" fill={COLORES.Tardanza} />
                     <Bar dataKey="Falta" stackId="a" fill={COLORES.Falta} />
+                    <Bar dataKey="Justificada" stackId="a" fill={COLORES.Justificada} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

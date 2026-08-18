@@ -362,16 +362,16 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
 
   const { data: existentes } = await supabaseAdmin
     .from("asistencia")
-    .select("id,estado")
+    .select("id,estado,justificada")
     .eq("alumno", alumnoId)
     .eq("curso", encontrada.horario.curso)
     .eq("fecha", hoyStr);
 
   // Si ya había una Falta automática para esta clase pero el alumno llegó y escaneó,
-  // se sube a Tardanza en vez de rechazarlo.
+  // se sube a Tardanza en vez de rechazarlo (salvo que ya esté justificada).
   const previo = (existentes ?? [])[0];
   if (previo) {
-    if (previo.estado === "Falta") {
+    if (previo.estado === "Falta" && !previo.justificada) {
       await supabaseAdmin.from("asistencia").update({ estado: "Tardanza" }).eq("id", previo.id);
       const { errores } = await subirFaltasSiLlego(alumnoId, hoyStr, montoTardanza);
       if (errores.length > 0) return { ok: false, error: errores[0] };
