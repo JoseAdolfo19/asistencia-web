@@ -122,7 +122,8 @@ async function subirFaltasSiLlego(
     .select("id,curso,alumno")
     .eq("alumno", alumnoId)
     .eq("fecha", hoyStr)
-    .eq("estado", "Falta");
+    .eq("estado", "Falta")
+    .eq("justificada", false);
 
   const { data: multas } = await supabaseAdmin
     .from("multas")
@@ -257,7 +258,8 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
     .from("asistencia")
     .select("id,alumno,curso")
     .eq("fecha", hoyStr)
-    .eq("estado", "Falta");
+    .eq("estado", "Falta")
+    .eq("justificada", false);
   const procesados = new Set<string>();
   for (const f of faltasHoy ?? []) {
     if (!llegaronHoy.has(f.alumno)) continue;

@@ -126,10 +126,10 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
     }
   }
 
-  const totalMio = rows.reduce((acc, m) => acc + Number(m.monto ?? 0), 0);
+  const totalMio = rows.reduce((acc, m) => acc + (m.estado === "Anulada" ? 0 : Number(m.monto ?? 0)), 0);
   const cobradas = rows.filter((m) => m.estado === "Pagado");
   const totalCobrado = cobradas.reduce((acc, m) => acc + Number(m.monto ?? 0), 0);
-  const pendientes = rows.filter((m) => m.estado !== "Pagado");
+  const pendientes = rows.filter((m) => m.estado !== "Pagado" && m.estado !== "Anulada");
   const totalPendiente = pendientes.reduce((acc, m) => acc + Number(m.monto ?? 0), 0);
 
   function exportar() {
@@ -163,8 +163,8 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
         monto: 0,
       };
       if (m.estado === "Pagado") e.pagadas++;
-      else e.pendientes++;
-      e.monto += Number(m.monto ?? 0);
+      else if (m.estado !== "Anulada") e.pendientes++;
+      e.monto += m.estado === "Anulada" ? 0 : Number(m.monto ?? 0);
       porAlumno.set(key, e);
     }
 
@@ -308,6 +308,7 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
             <option value="">Todos los estados</option>
             <option value="Pendiente">Pendiente</option>
             <option value="Pagado">Pagado</option>
+            <option value="Anulada">Anulada</option>
           </select>
         </div>
 
@@ -395,11 +396,11 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                     <td className="px-4 py-2 text-slate-600">{m.motivo || "—"}</td>
                     <td className="px-4 py-2 font-medium text-slate-800">S/ {Number(m.monto).toFixed(2)}</td>
                     <td className="px-4 py-2">
-                      <Badge variant={m.estado === "Pagado" ? "green" : "red"}>{m.estado}</Badge>
+                      <Badge variant={m.estado === "Pagado" ? "green" : m.estado === "Anulada" ? "slate" : "red"}>{m.estado}</Badge>
                     </td>
                     {puedeCobrar && (
                       <td className="px-4 py-2">
-                        {m.estado === "Pagado" ? (
+                        {m.estado === "Pagado" || m.estado === "Anulada" ? (
                           <span className="text-xs text-slate-400">—</span>
                         ) : (
                           <Button
@@ -439,8 +440,8 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                   <span className="font-semibold text-slate-800">S/ {Number(m.monto).toFixed(2)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <Badge variant={m.estado === "Pagado" ? "green" : "red"}>{m.estado}</Badge>
-                  {puedeCobrar && m.estado !== "Pagado" && (
+                  <Badge variant={m.estado === "Pagado" ? "green" : m.estado === "Anulada" ? "slate" : "red"}>{m.estado}</Badge>
+                  {puedeCobrar && m.estado !== "Pagado" && m.estado !== "Anulada" && (
                     <Button
                       variant="success"
                       size="sm"

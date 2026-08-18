@@ -144,6 +144,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 - **Auditoría** (`src/lib/auditoria.ts`, tabla `auditoria`): registra login, bloqueos, cambio de contraseña, cobros, creación/edición de clases, aperturas y marcaciones (usuario, rol, acción, detalle, fecha).
 - **Sesiones expirables** (`alumnos.session_version`): el administrador puede `cerrarSesionTodosDispositivos()`; al incrementar la versión, todas las cookies del usuario quedan invalidadas. La firma de la cookie incluye la versión.
 - **Botón tesorera "multa por buzo"**: en el panel de Multas, la tesorera/admin selecciona un alumno y crea una multa tipo **Buzo** (monto `multa_buzo`) que el alumno ve en su panel.
+- **Justificación de faltas/tardanzas**: docente, tesorera o admin pueden marcar una Falta/Tardanza como **justificada** (con motivo) desde el panel de Asistencia. El registro muestra el badge "Justificada", la multa asociada se **anula** (estado `Anulada`) y no cuenta como pendiente ni en el resumen de multas.
 
 ---
 
@@ -273,6 +274,7 @@ Guardados en `C:\Users\jose\AppData\Local\Temp\opencode\`:
 | `forzar_cambio_password.sql` | Agrega `alumnos.debe_cambiar_password` y lo activa para Alumno/Docente/Tesorera |
 | `seguridad_2026.sql` | RLS: elimina política `insert_asistencia`, tablas `auditoria`/`rate_limits`, columnas `session_version`/`login_intentos`/`login_bloqueado_hasta` |
 | `horario_definitivo_2026.sql` | Horario definitivo 2026-II (18 bloques), cursos 9/10, docente Uriel, AL010 → Docente |
+| `justificacion_asistencia.sql` | Columnas `asistencia.justificada` / `motivo_justificacion` para justificar faltas/tardanzas |
 
 Scripts de CI/CD (`ieslasalle-web/.github/workflows/`): `ci.yml` (typecheck + lint + tests + build) y `backup.yml` (respaldo nocturno de la BD vía GitHub Actions).
 
@@ -315,3 +317,4 @@ npm run dev        # http://localhost:3000
 24. **GitHub Actions**: `ci.yml` (typecheck + lint + tests + build) y `backup.yml` (respaldo diario de la BD como artefacto).
 25. **Horario definitivo 2026-II (Contabilidad II)**: 18 bloques 08:00–13:30 con receso 11:00–11:30; Lunes Cívico y Taller de fortalecimiento **con QR**; Ofimática con docente Uriel (`uriel@ieslasalle.edu.pe`); Jose AL010 cambiado a rol Docente para pruebas.
 26. **Botón tesorera "multa por buzo"**: `crearMultaBuzo` crea la multa tipo Buzo por alumno desde el panel de Multas.
+27. **Justificación de faltas/tardanzas**: docente/tesorera/admin marcan una Falta/Tardanza como justificada (columnas `justificada`/`motivo_justificacion`); la multa asociada se anula (estado `Anulada`).

@@ -77,7 +77,7 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
       );
 
       // Multas
-      const pendiente = filasMultas.filter((m) => m.estado !== "Pagado");
+      const pendiente = filasMultas.filter((m) => m.estado !== "Pagado" && m.estado !== "Anulada");
       const pagado = filasMultas.filter((m) => m.estado === "Pagado");
       setMultas({
         pendiente: pendiente.length,

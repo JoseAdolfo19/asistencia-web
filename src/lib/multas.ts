@@ -59,3 +59,57 @@ export async function crearMultaBuzo(alumnoId: string): Promise<CrearMultaResult
   await registrarAuditoria("crear_multa_buzo", `Multa de buzo (S/ ${monto}) a ${id}`);
   return { ok: true };
 }
+
+export type JustificarResult = { ok: boolean; error?: string };
+
+export async function justificarAsistencia(
+  registroId: number,
+  motivo: string
+): Promise<JustificarResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sesión expirada" };
+
+  // Docente, Tesorera o Administrador pueden justificar faltas/tardanzas
+  if (!["Docente", "Tesorera", "Administrador"].includes(session.rol)) {
+    return { ok: false, error: "Solo docentes, tesorera o administrador pueden justificar asistencia" };
+  }
+
+  const id = Number(registroId);
+  if (!id) return { ok: false, error: "Registro inválido" };
+  const texto = String(motivo || "").trim();
+  if (!texto) return { ok: false, error: "Escribe el motivo de la justificación" };
+
+  const { data: fila, error: errSelect } = await supabaseAdmin
+    .from("asistencia")
+    .select("id,alumno,curso,fecha,estado")
+    .eq("id", id)
+    .limit(1);
+  if (errSelect || !fila || fila.length === 0) return { ok: false, error: "Registro no encontrado" };
+
+  const reg = fila[0];
+  if (reg.estado !== "Falta" && reg.estado !== "Tardanza") {
+    return { ok: false, error: "Solo se puede justificar una Falta o Tardanza" };
+  }
+
+  // Marca el registro como justificado
+  const { error: errUpdate } = await supabaseAdmin
+    .from("asistencia")
+    .update({ justificada: true, motivo_justificacion: texto })
+    .eq("id", id);
+  if (errUpdate) return { ok: false, error: "No se pudo justificar: " + errUpdate.message };
+
+  // Anula la multa pendiente asociada (Tardanza) de ese alumno en esa fecha
+  const { error: errMulta } = await supabaseAdmin
+    .from("multas")
+    .update({ estado: "Anulada", motivo: "Anulada por justificación: " + texto })
+    .eq("alumno", reg.alumno)
+    .eq("fecha", reg.fecha)
+    .eq("estado", "Pendiente");
+  if (errMulta) return { ok: false, error: "Registro justificado pero no se pudo anular la multa: " + errMulta.message };
+
+  await registrarAuditoria(
+    "justificar_asistencia",
+    `${session.nombres} ${session.apellidos} justificó ${reg.estado} de ${reg.alumno} en ${reg.curso} (${reg.fecha}): ${texto}`
+  );
+  return { ok: true };
+}

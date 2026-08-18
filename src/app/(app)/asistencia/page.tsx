@@ -8,5 +8,5 @@ export default async function AsistenciaPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <AsistenciaPanel isAdmin={session.rol !== "Alumno"} alumnoId={session.id} />;
+  return <AsistenciaPanel isAdmin={session.rol !== "Alumno"} rol={session.rol} alumnoId={session.id} />;
 }

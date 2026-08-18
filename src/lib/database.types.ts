@@ -79,6 +79,8 @@ export type Database = {
           fecha: string
           hora: string
           id: number
+          justificada: boolean | null
+          motivo_justificacion: string | null
         }
         Insert: {
           alumno: string
@@ -87,6 +89,8 @@ export type Database = {
           fecha: string
           hora: string
           id?: number
+          justificada?: boolean | null
+          motivo_justificacion?: string | null
         }
         Update: {
           alumno?: string
@@ -95,6 +99,8 @@ export type Database = {
           fecha?: string
           hora?: string
           id?: number
+          justificada?: boolean | null
+          motivo_justificacion?: string | null
         }
         Relationships: []
       }

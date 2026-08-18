@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { justificarAsistencia } from "@/lib/multas";
 import { exportarExcel } from "@/lib/exportar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -15,6 +16,8 @@ type AsistenciaRow = {
   hora: string | null;
   curso: string;
   estado: string;
+  justificada: boolean | null;
+  motivo_justificacion: string | null;
 };
 
 const badgePorEstado: Record<string, "green" | "amber" | "red" | "slate"> = {
@@ -23,9 +26,18 @@ const badgePorEstado: Record<string, "green" | "amber" | "red" | "slate"> = {
   Falta: "red",
 };
 
-export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolean; alumnoId: string }) {
+export default function AsistenciaPanel({
+  isAdmin,
+  rol,
+  alumnoId,
+}: {
+  isAdmin: boolean;
+  rol: string;
+  alumnoId: string;
+}) {
   const [cursos, setCursos] = useState<string[]>([]);
   const [alumnos, setAlumnos] = useState<{ id: string; nombre: string }[]>([]);
+  const [puedeJustificar, setPuedeJustificar] = useState(false);
 
   const [filtroCurso, setFiltroCurso] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
@@ -34,6 +46,8 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
   const [alumnosMap, setAlumnosMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [justificandoId, setJustificandoId] = useState<number | null>(null);
 
   useEffect(() => {
     supabase
@@ -53,6 +67,10 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
         );
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    setPuedeJustificar(rol === "Docente" || rol === "Tesorera" || rol === "Administrador");
+  }, [rol]);
 
   const cargar = useCallback(
     async (curso: string, fecha: string, alumno: string) => {
@@ -95,29 +113,58 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
     cargar(filtroCurso, filtroFecha, filtroAlumno);
   }, [cargar, filtroCurso, filtroFecha, filtroAlumno]);
 
+  async function justificar(row: AsistenciaRow) {
+    if (justificandoId !== null) return;
+    const motivo = window.prompt(
+      `Motivo de la justificación para ${alumnosMap.get(row.alumno) ?? row.alumno} (${row.estado} en ${row.curso}):`
+    );
+    if (motivo === null) return;
+    if (!motivo.trim()) {
+      setMsg({ ok: false, text: "El motivo es obligatorio." });
+      return;
+    }
+    setJustificandoId(row.id);
+    setMsg(null);
+    const res = await justificarAsistencia(row.id, motivo.trim());
+    setJustificandoId(null);
+    if (!res.ok) {
+      setMsg({ ok: false, text: res.error || "Error al justificar." });
+    } else {
+      setMsg({ ok: true, text: "Falta/Tardanza justificada. La multa asociada fue anulada." });
+      cargar(filtroCurso, filtroFecha, filtroAlumno);
+    }
+  }
+
   async function exportar() {
-    const encabezados = isAdmin ? ["Alumno", "Fecha", "Hora", "Curso", "Estado"] : ["Fecha", "Hora", "Curso", "Estado"];
+    const encabezados = isAdmin
+      ? ["Alumno", "Fecha", "Hora", "Curso", "Estado"]
+      : ["Fecha", "Hora", "Curso", "Estado"];
     const filas = rows.map((a) => [
       ...(isAdmin ? [alumnosMap.get(a.alumno) ?? a.alumno] : []),
       a.fecha,
       a.hora?.slice(0, 5) ?? "",
       a.curso,
-      a.estado,
+      a.justificada ? `${a.estado} (Justificada)` : a.estado,
     ]);
 
     const resEncabezados = isAdmin
-      ? ["Alumno", "Presente", "Tardanza", "Falta", "Total multas (S/)"]
-      : ["Presente", "Tardanza", "Falta", "Total multas (S/)"];
+      ? ["Alumno", "Presente", "Tardanza", "Falta", "Justificadas", "Total multas (S/)"]
+      : ["Presente", "Tardanza", "Falta", "Justificadas", "Total multas (S/)"];
 
-    const porAlumno = new Map<string, { nombre: string; presente: number; tardanza: number; falta: number }>();
+    const porAlumno = new Map<
+      string,
+      { nombre: string; presente: number; tardanza: number; falta: number; justificadas: number }
+    >();
     for (const a of rows) {
       const e = porAlumno.get(a.alumno) ?? {
         nombre: alumnosMap.get(a.alumno) ?? a.alumno,
         presente: 0,
         tardanza: 0,
         falta: 0,
+        justificadas: 0,
       };
-      if (a.estado === "Presente") e.presente++;
+      if (a.justificada) e.justificadas++;
+      else if (a.estado === "Presente") e.presente++;
       else if (a.estado === "Tardanza") e.tardanza++;
       else if (a.estado === "Falta") e.falta++;
       porAlumno.set(a.alumno, e);
@@ -126,9 +173,10 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
     const ids = [...porAlumno.keys()];
     const multasPorAlumno = new Map<string, number>();
     if (ids.length > 0) {
-      const { data } = await supabase.from("multas").select("alumno,monto").in("alumno", ids);
+      const { data } = await supabase.from("multas").select("alumno,monto,estado").in("alumno", ids);
       for (const m of data ?? [])
-        multasPorAlumno.set(m.alumno, (multasPorAlumno.get(m.alumno) ?? 0) + Number(m.monto ?? 0));
+        if (m.estado !== "Anulada")
+          multasPorAlumno.set(m.alumno, (multasPorAlumno.get(m.alumno) ?? 0) + Number(m.monto ?? 0));
     }
 
     const resFilas: (string | number)[][] = [];
@@ -139,6 +187,7 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
         e.presente,
         e.tardanza,
         e.falta,
+        e.justificadas,
         `S/ ${totalMultas.toFixed(2)}`,
       ]);
     }
@@ -155,6 +204,16 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
       <p className="mt-1 text-sm text-slate-500">
         {isAdmin ? "Registros de todos los alumnos" : "Tus registros de asistencia"}
       </p>
+
+      {msg && (
+        <div
+          className={`mt-3 rounded-xl px-4 py-3 text-sm ${
+            msg.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
+          }`}
+        >
+          {msg.text}
+        </div>
+      )}
 
       <div className="mt-4 grid gap-3 rounded-xl bg-white p-4 shadow sm:grid-cols-3">
         <div>
@@ -258,6 +317,7 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
                   <th scope="col" className="px-4 py-2 font-medium">Hora</th>
                   <th scope="col" className="px-4 py-2 font-medium">Curso</th>
                   <th scope="col" className="px-4 py-2 font-medium">Estado</th>
+                  {puedeJustificar && <th scope="col" className="px-4 py-2 font-medium">Justificar</th>}
                 </tr>
               </thead>
               <tbody>
@@ -270,13 +330,36 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
                     <td className="px-4 py-2 text-slate-600">{a.hora?.slice(0, 5)}</td>
                     <td className="px-4 py-2 text-slate-800">{a.curso}</td>
                     <td className="px-4 py-2">
-                      <Badge variant={badgePorEstado[a.estado] ?? "slate"}>{a.estado}</Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant={badgePorEstado[a.estado] ?? "slate"}>{a.estado}</Badge>
+                        {a.justificada && <Badge variant="slate">Justificada</Badge>}
+                      </div>
                     </td>
+                    {puedeJustificar &&
+                      (a.estado === "Falta" || a.estado === "Tardanza") &&
+                      !a.justificada && (
+                        <td className="px-4 py-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={justificandoId === a.id}
+                            onClick={() => justificar(a)}
+                          >
+                            {justificandoId === a.id ? "..." : "Justificar"}
+                          </Button>
+                        </td>
+                      )}
+                    {puedeJustificar &&
+                      (a.estado === "Falta" || a.estado === "Tardanza") &&
+                      a.justificada && <td className="px-4 py-2" />}
                   </tr>
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={isAdmin ? 5 : 4} className="px-4 py-8 text-center text-slate-400">
+                    <td
+                      colSpan={(isAdmin ? 5 : 4) + (puedeJustificar ? 1 : 0)}
+                      className="px-4 py-8 text-center text-slate-400"
+                    >
                       Sin registros de asistencia.
                     </td>
                   </tr>
@@ -295,8 +378,24 @@ export default function AsistenciaPanel({ isAdmin, alumnoId }: { isAdmin: boolea
                     {a.curso} · {a.fecha}
                     {a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}
                   </span>
-                  <Badge variant={badgePorEstado[a.estado] ?? "slate"}>{a.estado}</Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={badgePorEstado[a.estado] ?? "slate"}>{a.estado}</Badge>
+                    {a.justificada && <Badge variant="slate">Justificada</Badge>}
+                  </div>
                 </div>
+                {puedeJustificar &&
+                  (a.estado === "Falta" || a.estado === "Tardanza") &&
+                  !a.justificada && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={justificandoId === a.id}
+                      onClick={() => justificar(a)}
+                      className="mt-2 w-full"
+                    >
+                      {justificandoId === a.id ? "..." : "Justificar"}
+                    </Button>
+                  )}
               </li>
             ))}
             {rows.length === 0 && (
