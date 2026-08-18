@@ -1,4 +1,4 @@
-# IES La Salle — Sistema de Asistencia con QR
+﻿# IES La Salle — Sistema de Asistencia con QR
 
 Sistema web de asistencia por QR y control de multas para el Instituto de Educación Superior La Salle (Urubamba). Reemplaza el sistema anterior basado en Google Apps Script + Hojas de Cálculo.
 
@@ -36,38 +36,7 @@ Sistema web de asistencia por QR y control de multas para el Instituto de Educac
 
 ---
 
-## 3. Cuentas de acceso
-
-El login es el correo institucional del alumno/docente (`DNI@ieslasalle.edu.pe`). La contraseña por defecto es el DNI (docentes: su nombre en mayúsculas). Al iniciar sesión por primera vez, el sistema **obliga a cambiar la contraseña** (bandera `alumnos.debe_cambiar_password`): no se permite usar el DNI ni el nombre, mínimo 8 caracteres. Solo después de cambiarla se accede al resto del sistema.
-
-### Administrador
-| Correo | Contraseña | Rol |
-|---|---|---|
-| `admin@ieslasalle.edu.pe` | `admin@159/` | Administrador (AL033) |
-
-### Docentes (login `primernombre@ieslasalle.edu.pe`, contraseña `PRIMERNOMBRE`)
-| Docente | Login | Curso(s) |
-|---|---|---|
-| Norka Alexandra Mendoza Huanca | `norka@ieslasalle.edu.pe` / `NORKA` | Tutoría |
-| Neil Lucero Rodriguez Velasco | `neil@ieslasalle.edu.pe` / `NEIL` | Interpretación y Producción de Textos |
-| Estrella Nicol Callañaupa Jesús | `estrella@ieslasalle.edu.pe` / `ESTRELLA` | Planeamiento Estratégico |
-| Aldo Atausinchi Masias | `aldo@ieslasalle.edu.pe` / `ALDO` | Administración Empresarial, Legislación Laboral |
-| Amparo Piedad Lechuga Hancco | `amparo@ieslasalle.edu.pe` / `AMPARO` | Legislación Mercantil, Registro de Libros Auxiliares |
-| Uriel | `uriel@ieslasalle.edu.pe` / `URIELDOCENTE1` | Ofimática |
-| Jose Adolfo IBERICO SUÑA (ex alumno AL010, pruebas) | `60021765@ieslasalle.edu.pe` / `60021765` | Escanea QR en las pruebas |
-
-### Tesorera
-| Correo | Contraseña | Rol |
-|---|---|---|
-| `79258583@ieslasalle.edu.pe` | `79258583` | Tesorera (AL029, Dayanna Tene Canal) |
-
-### Alumnos
-Los **31 alumnos** (AL001–AL032, excepto AL029 que es la tesorera) tienen login habilitado: `DNI@ieslasalle.edu.pe` con contraseña = **DNI**.
-Ejemplo: AL010 → `60021765@ieslasalle.edu.pe` / `60021765`. (Nota: AL010 cambió a rol Docente para las pruebas 2026-II.)
-
----
-
-## 4. Roles y permisos
+## 3. Roles y permisos
 
 | Función | Alumno | Docente | Tesorera | Admin |
 |---|---|---|---|---|
@@ -84,7 +53,7 @@ Ejemplo: AL010 → `60021765@ieslasalle.edu.pe` / `60021765`. (Nota: AL010 cambi
 
 ---
 
-## 5. Lógica de asistencia (zona horaria Perú)
+## 4. Lógica de asistencia (zona horaria Perú)
 
 Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`src/lib/estado.ts`), tanto en servidor como en cliente.
 
@@ -110,7 +79,7 @@ Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`sr
 
 ---
 
-## 6. Horario semanal (definitivo 2026-II)
+## 5. Horario semanal (definitivo 2026-II)
 
 Clases de 08:00 a 13:30, receso de 11:00 a 11:30.
 
@@ -130,7 +99,7 @@ El administrador puede editar esta distribución desde **Horario → "Editar hor
 
 ---
 
-## 6b. Exportar a Excel
+## 5b. Exportar a Excel
 
 Los paneles de **Asistencia** y **Multas** tienen un botón "Exportar Excel" que descarga un archivo `.xls` compatible con Excel (sin librerías externas, vía `src/lib/exportar.ts`). Cada archivo tiene **dos hojas**:
 
@@ -145,7 +114,7 @@ El botón se deshabilita si no hay filas que exportar.
 
 ---
 
-## 6c. Dashboard
+## 5c. Dashboard
 
 En **Dashboard** (visible para todos) se muestran:
 
@@ -158,7 +127,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 
 ---
 
-## 6d. Backups periódicos
+## 5d. Backups periódicos
 
 - Script `scripts/backup.js`: vuelca las 8 tablas de Supabase vía REST (service_role) a `backups/backup-<fecha>/` en JSON, con paginación.
 - Tarea programada de Windows **IESLaSalle-Backup** (diaria a las 22:00) y **IESLaSalle-Backup-Mediodia** (diaria a las 12:00), que ejecutan `scripts/backup_diario.bat`.
@@ -166,7 +135,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 - Ejecución manual: `node scripts/backup.js`.
 - `backups/` y `.env*` están en `.gitignore`.
 
-## 6e. Seguridad (rate limiting, auditoría, sesiones)
+## 5e. Seguridad (rate limiting, auditoría, sesiones)
 
 - **Rate limiting** (`src/lib/rateLimit.ts`, tabla `rate_limits`):
   - Login: máx. 5 intentos fallidos → bloqueo 15 min (`alumnos.login_intentos` / `login_bloqueado_hasta`).
@@ -178,7 +147,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 
 ---
 
-## 7. Base de datos (Supabase)
+## 6. Base de datos (Supabase)
 
 - Proyecto: `wdusozavhsgqlwsyxmzb` (`https://wdusozavhsgqlwsyxmzb.supabase.co`)
 - Datos creados en la migración: `C:\xampp\htdocs\frontend-app-mat\migracion_ieslasalle.sql`
@@ -214,7 +183,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 
 ---
 
-## 8. Estructura del código
+## 7. Estructura del código
 
 ```
 src/
@@ -268,7 +237,7 @@ src/
 
 ---
 
-## 9. Variables de entorno
+## 8. Variables de entorno
 
 Archivo `.env.local`:
 
@@ -284,7 +253,7 @@ Las variables de Supabase y `QR_SECRET` están configuradas en producción (Verc
 
 ---
 
-## 10. Scripts SQL relevantes
+## 9. Scripts SQL relevantes
 
 Guardados en `C:\Users\jose\AppData\Local\Temp\opencode\`:
 
@@ -309,7 +278,7 @@ Scripts de CI/CD (`ieslasalle-web/.github/workflows/`): `ci.yml` (typecheck + li
 
 ---
 
-## 11. Desarrollo local
+## 10. Desarrollo local
 
 ```bash
 npm install
@@ -318,7 +287,7 @@ npm run dev        # http://localhost:3000
 
 ---
 
-## 12. Historial de hitos
+## 11. Historial de hitos
 
 1. Migración de datos desde el sistema Google Apps Script a Supabase.
 2. Creación de la app web `ieslasalle-web` (Next.js) e implementación de login propio.
