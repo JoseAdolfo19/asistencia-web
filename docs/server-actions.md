@@ -18,7 +18,7 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 | Acción | Rol | Qué hace |
 |---|---|---|
 | `getDocenteQrToken(claseId, curso, fecha, seed)` | Docente/Admin | Genera el token QR firmado por el servidor para la clase activa (el docente lo muestra para que los alumnos lo escaneen). Rate limit: 12/min. |
-| `marcarConQrDocente(token)` | Alumno/Tesorera | El alumno escanea el QR del docente y se marca él mismo (su identidad sale de la sesión). Valida la firma QR (ventana 30s), registra Presente/Tardanza y sube Faltas previas. Rate limit: 6/min. |
+| `marcarConQrDocente(token)` | Alumno/Tesorera | El alumno escanea el QR del docente y se marca él mismo (su identidad sale de la sesión). Valida la firma QR (ventana efectiva de hasta 60 s: dos periodos de 30 s), registra Presente/Tardanza y sube Faltas previas. Rate limit: 6/min. |
 | `marcarAsistencia(token, alumnoId)` | Docente/Admin | Respaldo de escaneo (cámara/entrada manual): igual que la anterior pero indicando el alumno. Rate limit: 30/min. |
 | `resolverAlumno(nombre)` | Docente/Admin | Busca un alumno por nombre completo para la entrada manual de `/escanear`. |
 | `abrirClase(curso)` | Docente/Admin | Abre manualmente una clase hoy (rechazada si la clase ya terminó). |

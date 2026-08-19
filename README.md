@@ -51,6 +51,7 @@ Sistema web de asistencia por QR y control de multas para el Instituto de Educac
 | Ver asistencia de todos | ✖ | ✔ | ✔ | ✔ |
 | Ver multas de todos | ✖ | ✔ | ✔ | ✔ |
 | Cobrar multas (marcar Pagado) | ✖ | ✖ | ✔ | ✔ |
+| Justificar falta/tardanza | ✖ | ✔ | ✔ | ✔ |
 | Control de actividades (crear, marcar participación, cerrar) | ✖ | ✖ | ✔ | ✔ |
 | Gestionar usuarios (perfil + restablecer claves) | ✖ | ✖ | ✖ | ✔ |
 | Editar horario | ✖ | ✖ | ✖ | ✔ |
@@ -141,7 +142,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 
 ## 5d. Backups periódicos
 
-- Script `scripts/backup.js`: vuelca las 8 tablas de Supabase vía REST (service_role) a `backups/backup-<fecha>/` en JSON, con paginación.
+- Script `scripts/backup.js`: vuelca las 12 tablas de Supabase vía REST (service_role) a `backups/backup-<fecha>/` en JSON, con paginación.
 - Tarea programada de Windows **IESLaSalle-Backup** (diaria a las 22:00) y **IESLaSalle-Backup-Mediodia** (diaria a las 12:00), que ejecutan `scripts/backup_diario.bat`.
 - `backup_diario.bat` rota el log: conserva la ejecución anterior en `backups/backup.log.prev` y escribe la actual en `backups/backup.log` (no crece indefinidamente).
 - Ejecución manual: `node scripts/backup.js`.
@@ -158,7 +159,6 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 - **Sesiones expirables** (`alumnos.session_version`): el administrador puede `cerrarSesionTodosDispositivos()`; al incrementar la versión, todas las cookies del usuario quedan invalidadas. La firma de la cookie incluye la versión.
 - **Botón tesorera "multa por buzo"**: en el panel de Multas, la tesorera/admin selecciona un alumno y crea una multa tipo **Buzo** (monto `multa_buzo`) que el alumno ve en su panel.
 - **Justificación de faltas/tardanzas**: docente, tesorera o admin pueden marcar una Falta/Tardanza como **justificada** (con motivo) desde el panel de Asistencia. El registro muestra el badge "Justificada", la multa asociada se **anula** (estado `Anulada`) y no cuenta como pendiente ni en el resumen de multas.
-- **Rate limiting adicional** (`src/lib/rateLimit.ts`): `getDocenteQrToken` máx. 12 tokens/min por docente; `marcarConQrDocente` máx. 6 marcaciones/min por alumno.
 - **Conexiones con timeout**: los clientes de Supabase (`supabase.ts` y `supabaseAdmin.ts`) usan `AbortSignal.timeout(45 s)` para que ninguna petición se cuelgue.
 
 ## 5f. Control de Actividades
@@ -308,7 +308,7 @@ Guardados en `C:\Users\jose\AppData\Local\Temp\opencode\`:
 | `politicas_rls.sql` | Grants + políticas RLS |
 | `bootstrap_admin.sql` | Cuenta admin (AL033) |
 | `alumnos_credenciales.sql` | Login de los 32 alumnos (password = DNI) |
-| `docentes_credenciales.sql` | Cuentas D001–D006 |
+| `docentes_credenciales.sql` | Cuentas de docentes (D001, D002, D003, D005, D006, D007; no existe D004) |
 | `tesorera_credenciales.sql` | Cuenta tesorera (AL029) |
 | `excepcion_y_apertura.sql` | Exclusión cursos + tabla `clases_abiertas` |
 | `eliminar_pruebas.sql` | Borra cursos de prueba |

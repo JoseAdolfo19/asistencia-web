@@ -22,14 +22,18 @@ function loadEnv() {
 }
 
 const TABLAS = [
-  "alumnos",
-  "docentes",
-  "cursos",
-  "horario",
-  "asistencia",
-  "multas",
-  "configuracion",
-  "clases_abiertas",
+  { tabla: "alumnos", orden: "id" },
+  { tabla: "docentes", orden: "id" },
+  { tabla: "cursos", orden: "id" },
+  { tabla: "horario", orden: "id" },
+  { tabla: "asistencia", orden: "id" },
+  { tabla: "multas", orden: "id" },
+  { tabla: "configuracion", orden: "id" },
+  { tabla: "clases_abiertas", orden: "id" },
+  { tabla: "actividades", orden: "id" },
+  { tabla: "actividad_alumnos", orden: "id" },
+  { tabla: "auditoria", orden: "id" },
+  { tabla: "rate_limits", orden: "clave" },
 ];
 
 async function main() {
@@ -49,7 +53,7 @@ async function main() {
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   let total = 0;
 
-  for (const tabla of TABLAS) {
+  for (const { tabla, orden } of TABLAS) {
     let todos = [];
     let desde = 0;
     const page = 1000;
@@ -58,7 +62,7 @@ async function main() {
       const { data, error } = await supabase
         .from(tabla)
         .select("*")
-        .order("id", { ascending: true })
+        .order(orden, { ascending: true })
         .range(desde, desde + page - 1);
       if (error) {
         console.error(`Error en ${tabla}:`, error.message);
@@ -77,7 +81,7 @@ async function main() {
 
   const resumen = {
     generado: new Date().toISOString(),
-    tablas: TABLAS,
+    tablas: TABLAS.map((t) => t.tabla),
     totalFilas: total,
   };
   fs.writeFileSync(path.join(carpeta, "_resumen.json"), JSON.stringify(resumen, null, 2), "utf8");
