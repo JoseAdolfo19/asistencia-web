@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 
 export default function RecuperarPanel() {
   const router = useRouter();
-  const [codigo, setCodigo] = useState("");
+  const [correo, setCorreo] = useState("");
   const [dni, setDni] = useState("");
   const [verificado, setVerificado] = useState<{ id: string; nombre: string } | null>(null);
   const [nueva, setNueva] = useState("");
@@ -21,7 +21,7 @@ export default function RecuperarPanel() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await verificarIdentidad(codigo, dni);
+    const res = await verificarIdentidad(correo, dni);
     setLoading(false);
     if (res.ok) setVerificado({ id: res.id, nombre: res.nombre });
     else setError(res.error);
@@ -35,7 +35,7 @@ export default function RecuperarPanel() {
       return;
     }
     setLoading(true);
-    const res = await recuperarContrasena(codigo, dni, nueva);
+    const res = await recuperarContrasena(correo, dni, nueva);
     setLoading(false);
     if (res.ok) {
       setOk(true);
@@ -58,13 +58,13 @@ export default function RecuperarPanel() {
         ) : !verificado ? (
           <form onSubmit={verificar} className="mt-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700">Código</label>
+              <label className="block text-sm font-medium text-slate-700">Correo</label>
               <input
-                type="text"
+                type="email"
                 required
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                placeholder="AL001"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                placeholder="DNI@ieslasalle.edu.pe"
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
             </div>
@@ -87,7 +87,7 @@ export default function RecuperarPanel() {
               {loading ? "Verificando..." : "Verificar identidad"}
             </Button>
             <p className="text-center text-xs text-slate-400">
-              Si no recuerdas tu código o DNI, contacta al administrador para restablecer tu contraseña.
+              Si no recuerdas tu correo o DNI, contacta al administrador para restablecer tu contraseña.
             </p>
           </form>
         ) : (
