@@ -17,10 +17,28 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 
 | Acción | Rol | Qué hace |
 |---|---|---|
-| `getQrToken(claseId, curso, fecha, seed)` | Alumno | Genera el token QR firmado por el servidor para una clase activa. Rate limit: 12/min. |
-| `marcarAsistencia(token, alumnoId)` | Docente/Admin | Valida la firma QR (ventana 30s, semillas actual/anterior), registra Presente/Tardanza y sube Faltas previas. Rate limit: 30/min. |
-| `abrirClase(curso)` | Docente/Admin | Abre manualmente una clase hoy. |
-| `cerrarClasesPendientes()` | Docente/Admin | Cierra clases cuyo horario terminó: marca Falta/Tardanza y crea las multas. |
+| `getDocenteQrToken(claseId, curso, fecha, seed)` | Docente/Admin | Genera el token QR firmado por el servidor para la clase activa (el docente lo muestra para que los alumnos lo escaneen). Rate limit: 12/min. |
+| `marcarConQrDocente(token)` | Alumno/Tesorera | El alumno escanea el QR del docente y se marca él mismo (su identidad sale de la sesión). Valida la firma QR (ventana 30s), registra Presente/Tardanza y sube Faltas previas. Rate limit: 6/min. |
+| `marcarAsistencia(token, alumnoId)` | Docente/Admin | Respaldo de escaneo (cámara/entrada manual): igual que la anterior pero indicando el alumno. Rate limit: 30/min. |
+| `resolverAlumno(nombre)` | Docente/Admin | Busca un alumno por nombre completo para la entrada manual de `/escanear`. |
+| `abrirClase(curso)` | Docente/Admin | Abre manualmente una clase hoy (rechazada si la clase ya terminó). |
+| `cerrarClasesPendientes()` | Autenticado | Cierra clases cuyo horario terminó: marca Falta/Tardanza y crea las multas. Throttle de 1/min + inserts en lote. |
+
+## actividades.ts
+
+| Acción | Rol | Qué hace |
+|---|---|---|
+| `crearActividad(nombre, fecha, descripcion)` | Tesorera/Admin | Crea una actividad obligatoria y registra a todos los alumnos AL001–AL032 con participación `false`. |
+| `marcarParticipacion(actividadId, alumnoId, participo)` | Tesorera/Admin | Actualiza la participación de un alumno en la actividad. |
+| `cerrarActividad(actividadId)` | Tesorera/Admin | Genera la multa de S/50 (tipo `Actividad`) a quienes no participaron y cierra la actividad. |
+| `reabrirActividad(actividadId)` | Tesorera/Admin | Anula las multas pendientes de la actividad y la devuelve a "Abierta". |
+
+## admin.ts
+
+| Acción | Rol | Qué hace |
+|---|---|---|
+| `actualizarPerfil(id, datos)` | Administrador | Actualiza nombres, apellidos, correo, rol y estado de un usuario. Impide que el admin se cambie su propio rol y duplica-correos. |
+| `resetearPassword(id, nueva, forzarCambio)` | Administrador | Restablece la contraseña de un usuario (mín 8, no DNI/nombre) y opcionalmente exige cambio en el próximo ingreso (`debe_cambiar_password`). |
 
 ## multas.ts
 
@@ -41,7 +59,7 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 |---|---|---|
 | `qr.ts` | `generarFirmaQR`, `firmaValida`, `seedActual` | Firma y validación del token QR. |
 | `cierre.ts` | `planificarCierre`, `planificarSubirFaltas` | Decide Tardanza/Falta y multas al cerrar clases. |
-| `estado.ts` | `estadoClase`, `aMinutos`, `normalizeName` | Estados de clase y normalización. |
+| `estado.ts` | `estadoClase`, `aMinutos`, `normalizeName`, `esAlumnoRegistrado` | Estados de clase, normalización y restricción AL001–AL032. |
 | `rateLimit.ts` | `permitirRateLimit(clave, max, ventanaMs)` | Ventana de rate limiting sobre la tabla `rate_limits`. |
 | `auditoria.ts` | `registrarAuditoria(accion, detalle)` | Registra en la tabla `auditoria`. |
 | `session.ts` | `getSession`, `createSession`, `destroySession` | Manejo de cookie firmada con `session_version`. |

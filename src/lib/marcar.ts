@@ -14,6 +14,55 @@ function puedeEscanear(rol: string): boolean {
   return rol === "Docente" || rol === "Administrador";
 }
 
+type ClaseParaToken = {
+  id: number;
+  curso: string;
+  dia: string;
+  hora_inicio: string;
+  hora_fin: string;
+  apertura_qr: string | null;
+  cierre_lista: string | null;
+};
+
+type BaseDia = {
+  montoTardanza: number;
+  lista: ClaseParaToken[];
+  excluidos: Set<string>;
+};
+
+// Datos estables del día (config, cursos excluidos y horario). Se cachean un minuto
+// para no repetir lecturas en cada escaneo; lo mutable (clases_abiertas, asistencia)
+// siempre se lee fresco.
+let cacheBase: { ts: number; base: BaseDia } | null = null;
+const TTL_BASE_MS = 60_000;
+
+async function cargarBaseDia(): Promise<BaseDia> {
+  if (cacheBase && Date.now() - cacheBase.ts < TTL_BASE_MS) return cacheBase.base;
+
+  const [configRes, cursosRes, horarioRes] = await Promise.all([
+    supabaseAdmin.from("configuracion").select("*").limit(1),
+    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
+    supabaseAdmin.from("horario").select("*"),
+  ]);
+
+  const montoTardanza = Number(configRes.data?.[0]?.multa_tardanza) || 1;
+  const excluidos = new Set((cursosRes.data ?? []).map((c) => normalizeName(c.nombre)));
+  const hoy = diaHoy();
+  const lista = ((horarioRes.data ?? []) as ClaseParaToken[]).filter(
+    (h) => String(h.dia) === hoy && !excluidos.has(normalizeName(h.curso))
+  );
+
+  const base: BaseDia = { montoTardanza, lista, excluidos };
+  cacheBase = { ts: Date.now(), base };
+  return base;
+}
+
+// El cierre completo es costoso (genera Faltas/Tardanzas de todos los que no marcaron).
+// Se ejecuta como máximo una vez por minuto; es idempotente, así que entre medias
+// basta con el resultado del último cierre.
+let ultimoCierreCompleto = 0;
+const INTERVALO_CIERRE_MS = 60_000;
+
 export async function resolverAlumno(nombre: string): Promise<
   { ok: true; id: string; nombreCompleto: string } | { ok: false; error: string }
 > {
@@ -45,44 +94,27 @@ export async function resolverAlumno(nombre: string): Promise<
 
 export type QrTokenResult = { ok: true; token: string } | { ok: false; error: string };
 
-export async function getQrToken(
+// Valida que la clase sea de hoy, no excluida y esté en ventana (activa o cerrada)
+// y firma el token compartido de esa clase.
+async function tokenDeClaseActiva(
   claseId: number,
   curso: string,
   fecha: string,
   seed: number
 ): Promise<QrTokenResult> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
-  if (!esAlumno(session.rol) || !esAlumnoRegistrado(session.id)) return { ok: false, error: "Solo alumnos pueden generar QR" };
-
-  // Máximo 12 tokens por minuto por alumno (el QR se refresca cada 30s)
-  if (!(await permitirRateLimit(`qr:${session.id}`, 12, 60_000))) {
-    return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
-  }
-
   const id = Number(claseId);
   if (!id) return { ok: false, error: "Clase inválida" };
 
-  const [cursosRes, horarioRes, abiertasRes, horarioHoyRes] = await Promise.all([
-    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
-    supabaseAdmin.from("horario").select("*").eq("id", id).limit(1),
-    supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", fechaHoy()),
-    supabaseAdmin.from("horario").select("*").eq("dia", diaHoy()),
-  ]);
-  const cursos = cursosRes.data;
-  const horario = horarioRes.data;
-  const abiertas = abiertasRes.data;
-  const horarioHoy = horarioHoyRes.data;
-  const excluidos = new Set((cursos ?? []).map((c) => normalizeName(c.nombre)));
+  const base = await cargarBaseDia();
 
-  const h = horario?.[0];
-  if (!h) return { ok: false, error: "Clase no encontrada" };
+  const { data: abiertas } = await supabaseAdmin
+    .from("clases_abiertas")
+    .select("curso,hora_abierta")
+    .eq("fecha", fechaHoy());
 
-  // Verifica que el curso coincida con la clase activa y no esté excluido
-  const hoy = diaHoy();
-  const hoyStr = fechaHoy();
-  if (String(h.dia) !== hoy) return { ok: false, error: "La clase no es de hoy" };
-  if (excluidos.has(normalizeName(h.curso))) return { ok: false, error: "Curso sin QR" };
+  const h = base.lista.find((x) => x.id === id);
+  if (!h) return { ok: false, error: "Clase no encontrada o no es de hoy" };
+
   if (normalizeName(h.curso) !== normalizeName(String(curso || ""))) {
     return { ok: false, error: "Curso no coincide con la clase activa" };
   }
@@ -91,13 +123,34 @@ export async function getQrToken(
     (a) => normalizeName(a.curso) === normalizeName(h.curso)
   )?.hora_abierta ?? null;
 
-  const primera = esPrimeraClase(h, horarioHoy ?? [], hoy, excluidos);
+  const primera = esPrimeraClase(h, base.lista, diaHoy(), base.excluidos);
 
   const est = estadoClase(h, aperturaManual, primera);
-  if (est !== "Activa") return { ok: false, error: "La clase no está activa en este momento" };
+  if (est !== "Activa" && est !== "Cerrada") {
+    return { ok: false, error: "La clase no está en ventana de marcación" };
+  }
 
-  const token = generarFirmaQR(h.id, h.curso, hoyStr, seed, qrSecret());
+  const token = generarFirmaQR(h.id, h.curso, fechaHoy(), seed, qrSecret());
   return { ok: true, token };
+}
+
+// El docente muestra el QR de la clase activa para que los alumnos lo escaneen.
+export async function getDocenteQrToken(
+  claseId: number,
+  curso: string,
+  fecha: string,
+  seed: number
+): Promise<QrTokenResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores pueden mostrar el QR" };
+
+  // Máximo 12 tokens por minuto por docente
+  if (!(await permitirRateLimit(`qrdocente:${session.id}`, 12, 60_000))) {
+    return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
+  }
+
+  return tokenDeClaseActiva(claseId, curso, fecha, seed);
 }
 
 export type CierreResult = {
@@ -117,19 +170,22 @@ async function subirFaltasSiLlego(
 ): Promise<{ errores: string[]; subidas: number }> {
   const errores: string[] = [];
 
-  const { data: faltas } = await supabaseAdmin
-    .from("asistencia")
-    .select("id,curso,alumno")
-    .eq("alumno", alumnoId)
-    .eq("fecha", hoyStr)
-    .eq("estado", "Falta")
-    .eq("justificada", false);
-
-  const { data: multas } = await supabaseAdmin
-    .from("multas")
-    .select("motivo,asistencia_id")
-    .eq("alumno", alumnoId)
-    .eq("fecha", hoyStr);
+  const [faltasRes, multasRes] = await Promise.all([
+    supabaseAdmin
+      .from("asistencia")
+      .select("id,curso,alumno")
+      .eq("alumno", alumnoId)
+      .eq("fecha", hoyStr)
+      .eq("estado", "Falta")
+      .eq("justificada", false),
+    supabaseAdmin
+      .from("multas")
+      .select("motivo,asistencia_id")
+      .eq("alumno", alumnoId)
+      .eq("fecha", hoyStr),
+  ]);
+  const faltas = faltasRes.data;
+  const multas = multasRes.data;
 
   const plan = planificarSubirFaltas(
     (faltas ?? []) as FaltaPendiente[],
@@ -164,31 +220,28 @@ async function subirFaltasSiLlego(
 export async function cerrarClasesPendientes(): Promise<CierreResult> {
   const session = await getSession();
   if (!session) return { ok: false, cerradas: [], tardanzas: 0, faltas: 0, error: "Sesión expirada" };
-  if (!puedeEscanear(session.rol)) return { ok: false, cerradas: [], tardanzas: 0, faltas: 0, error: "Solo docentes o administradores" };
+
+  if (Date.now() - ultimoCierreCompleto < INTERVALO_CIERRE_MS) {
+    return { ok: true, cerradas: [], tardanzas: 0, faltas: 0 };
+  }
+  ultimoCierreCompleto = Date.now();
 
   const hoyStr = fechaHoy();
-  const hoy = diaHoy();
   const ahora = horaAhora();
   const ahoraMin = aMinutos(ahora);
 
-  // Lecturas independientes en paralelo (antes eran secuenciales)
-  const [configRes, cursosRes, horarioRes, abiertasRes, asisRes, alumnosRes] = await Promise.all([
-    supabaseAdmin.from("configuracion").select("*").limit(1),
-    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
-    supabaseAdmin.from("horario").select("*"),
+  // Config, cursos y horario vienen de la cache del día; lo mutable se lee fresco.
+  const base = await cargarBaseDia();
+
+  const [abiertasRes, asisRes, alumnosRes] = await Promise.all([
     supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", hoyStr),
-    supabaseAdmin.from("asistencia").select("alumno,curso,estado").eq("fecha", hoyStr),
+    supabaseAdmin.from("asistencia").select("id,alumno,curso,estado,justificada").eq("fecha", hoyStr),
     supabaseAdmin.from("alumnos").select("id").in("rol", ["Alumno", "Tesorera"]),
   ]);
-  const configRows = configRes.data;
-  const cursos = cursosRes.data;
-  const horario = horarioRes.data;
   const abiertas = abiertasRes.data;
   const asisHoy = asisRes.data;
   const alumnos = alumnosRes.data;
-  const montoTardanza = Number(configRows?.[0]?.multa_tardanza) || 1;
-
-  const excluidos = new Set((cursos ?? []).map((c) => normalizeName(c.nombre)));
+  const montoTardanza = base.montoTardanza;
 
   const aperturaPorCurso = new Map<string, string>();
   for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
@@ -203,9 +256,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
     marcaronCurso.get(k)!.add(a.alumno);
   }
 
-  const clasesHoy = (horario ?? []).filter(
-    (h) => String(h.dia) === hoy && !excluidos.has(normalizeName(h.curso))
-  ) as ClaseCierre[];
+  const clasesHoy = base.lista as ClaseCierre[];
 
   const alumnosIds = (alumnos ?? []).map((a) => a.id).filter(esAlumnoRegistrado);
 
@@ -216,57 +267,57 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
 
   const plan = planificarCierre(clasesHoy, alumnosIds, marcaronCurso, llegaronHoy, ahoraMin);
 
+  // Inserta por clase en lotes (2 consultas por clase en vez de 2 por alumno).
   for (const p of plan) {
-    let nuevos = 0;
-
-    for (const r of p.registros) {
-      const { data: asisInsertada, error: eAsis } = await supabaseAdmin
-        .from("asistencia")
-        .insert({
-          alumno: r.alumnoId,
-          curso: p.curso,
-          fecha: hoyStr,
-          hora: ahora,
-          estado: r.estado,
-        })
-        .select("id")
-        .single();
-      if (eAsis) {
-        errores.push(`Asistencia ${p.curso}: ${eAsis.message}`);
-        continue;
-      }
-
-      if (r.estado === "Tardanza") {
-        const { error: eMulta } = await supabaseAdmin.from("multas").insert({
-          alumno: r.alumnoId,
-          tipo: "Tardanza",
-          motivo: "No escaneó su QR en " + p.curso,
-          monto: montoTardanza,
-          fecha: hoyStr,
-          estado: "Pendiente",
-          asistencia_id: asisInsertada?.id ?? null,
-        });
-        if (eMulta) errores.push(`Multa ${p.curso}: ${eMulta.message}`);
-        tardanzas++;
-      } else {
-        faltas++;
-      }
-      nuevos++;
+    if (p.registros.length === 0) {
+      clasesCerradas.push(p.curso + " (sin pendientes)");
+      continue;
     }
 
-    clasesCerradas.push(nuevos > 0 ? p.curso : p.curso + " (sin pendientes)");
+    const filasAsis = p.registros.map((r) => ({
+      alumno: r.alumnoId,
+      curso: p.curso,
+      fecha: hoyStr,
+      hora: ahora,
+      estado: r.estado,
+    }));
+
+    const { data: insertadas, error: eAsis } = await supabaseAdmin
+      .from("asistencia")
+      .insert(filasAsis)
+      .select("id,alumno,curso,estado");
+    if (eAsis) {
+      errores.push(`Asistencia ${p.curso}: ${eAsis.message}`);
+      continue;
+    }
+
+    const filasMulta = (insertadas ?? [])
+      .filter((r) => r.estado === "Tardanza")
+      .map((r) => ({
+        alumno: r.alumno,
+        tipo: "Tardanza",
+        motivo: "No escaneó su QR en " + p.curso,
+        monto: montoTardanza,
+        fecha: hoyStr,
+        estado: "Pendiente",
+        asistencia_id: r.id,
+      }));
+
+    if (filasMulta.length > 0) {
+      const { error: eMulta } = await supabaseAdmin.from("multas").insert(filasMulta);
+      if (eMulta) errores.push(`Multa ${p.curso}: ${eMulta.message}`);
+    }
+
+    tardanzas += filasMulta.length;
+    faltas += filasAsis.length - filasMulta.length;
+    clasesCerradas.push(p.curso);
   }
 
   // Quienes llegaron hoy (aunque sea a una clase posterior) no pueden quedar con Falta:
   // sus Faltas de hoy se suben a Tardanza y se les genera la multa.
-  const { data: faltasHoy } = await supabaseAdmin
-    .from("asistencia")
-    .select("id,alumno,curso")
-    .eq("fecha", hoyStr)
-    .eq("estado", "Falta")
-    .eq("justificada", false);
+  const faltasHoy = (asisHoy ?? []).filter((a) => a.estado === "Falta" && !a.justificada);
   const procesados = new Set<string>();
-  for (const f of faltasHoy ?? []) {
+  for (const f of faltasHoy) {
     if (!llegaronHoy.has(f.alumno)) continue;
     if (procesados.has(f.alumno)) continue;
     procesados.add(f.alumno);
@@ -331,46 +382,31 @@ export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-export async function marcarAsistencia(token: string, alumnoId: string): Promise<MarcarResult> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
-  if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores pueden marcar asistencia" };
-  if (!esAlumnoRegistrado(String(alumnoId || ""))) return { ok: false, error: "Alumno no válido para marcar asistencia" };
-
-  // Máximo 30 marcaciones por minuto por docente (protege contra spam)
-  if (!(await permitirRateLimit(`marcar:${session.id}`, 30, 60_000))) {
-    return { ok: false, error: "Demasiadas marcaciones. Espera un momento." };
-  }
-
+// Procesa un token de clase para un alumno: valida la firma, registra Presente/Tardanza,
+// crea la multa si aplica y sube Faltas previas del día a Tardanza.
+async function marcarPorToken(
+  token: string,
+  alumnoId: string,
+  actorNombre: string
+): Promise<MarcarResult> {
   // Procesa cierres automáticos de clases y faltas/tardanzas pendientes antes de marcar
   await cerrarClasesPendientes();
 
   const t = String(token || "").trim();
   if (!t) return { ok: false, error: "Token vacío" };
 
-  const [configRes, cursosRes, horarioRes, abiertasRes] = await Promise.all([
-    supabaseAdmin.from("configuracion").select("*").limit(1),
-    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
-    supabaseAdmin.from("horario").select("*"),
-    supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", fechaHoy()),
-  ]);
-  const configRows = configRes.data;
-  const cursos = cursosRes.data;
-  const horario = horarioRes.data;
-  const abiertas = abiertasRes.data;
-  const montoTardanza = Number(configRows?.[0]?.multa_tardanza) || 1;
+  const { montoTardanza, lista, excluidos } = await cargarBaseDia();
 
-  const excluidos = new Set((cursos ?? []).map((c) => normalizeName(c.nombre)));
+  const { data: abiertas } = await supabaseAdmin
+    .from("clases_abiertas")
+    .select("curso,hora_abierta")
+    .eq("fecha", fechaHoy());
 
   const hoy = diaHoy();
   const hoyStr = fechaHoy();
 
   const aperturaPorCurso = new Map<string, string>();
   for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
-
-  const lista = (horario ?? []).filter(
-    (h) => String(h.dia) === hoy && !excluidos.has(normalizeName(h.curso))
-  );
 
   let encontrada: { horario: { id: number; curso: string }; estado: string } | null = null;
   for (const h of lista) {
@@ -402,7 +438,7 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
       if (errores.length > 0) return { ok: false, error: errores[0] };
       await registrarAuditoria(
         "marcar_asistencia",
-        `${session.nombres} ${session.apellidos} subió Falta a Tardanza a ${alumnoId} en ${encontrada.horario.curso}`
+        `${actorNombre} subió Falta a Tardanza a ${alumnoId} en ${encontrada.horario.curso}`
       );
       return { ok: true, estado: "Tardanza", curso: encontrada.horario.curso };
     }
@@ -443,8 +479,38 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
 
   await registrarAuditoria(
     "marcar_asistencia",
-    `${session.nombres} ${session.apellidos} marcó ${estado} a ${alumnoId} en ${encontrada.horario.curso}`
+    `${actorNombre} marcó ${estado} a ${alumnoId} en ${encontrada.horario.curso}`
   );
 
   return { ok: true, estado, curso: encontrada.horario.curso };
+}
+
+export async function marcarAsistencia(token: string, alumnoId: string): Promise<MarcarResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores pueden marcar asistencia" };
+  if (!esAlumnoRegistrado(String(alumnoId || ""))) return { ok: false, error: "Alumno no válido para marcar asistencia" };
+
+  // Máximo 30 marcaciones por minuto por docente (protege contra spam)
+  if (!(await permitirRateLimit(`marcar:${session.id}`, 30, 60_000))) {
+    return { ok: false, error: "Demasiadas marcaciones. Espera un momento." };
+  }
+
+  return marcarPorToken(token, alumnoId, session.nombres + " " + session.apellidos);
+}
+
+// El alumno escanea el QR del docente y se marca su propia asistencia (su identidad
+// sale de la sesión; el token solo identifica la clase activa).
+export async function marcarConQrDocente(token: string): Promise<MarcarResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden marcar con el QR del docente" };
+  if (!esAlumnoRegistrado(session.id)) return { ok: false, error: "Cuenta no habilitada para marcar asistencia" };
+
+  // Máximo 6 marcaciones por minuto por alumno
+  if (!(await permitirRateLimit(`marcar:${session.id}`, 6, 60_000))) {
+    return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
+  }
+
+  return marcarPorToken(token, session.id, session.nombres + " " + session.apellidos);
 }

@@ -12,7 +12,8 @@ const navItems = [
   { href: "/asistencia", label: "Asistencia" },
   { href: "/multas", label: "Multas" },
   { href: "/actividades", label: "Actividades" },
-  { href: "/qr", label: "QR" },
+  { href: "/qr", label: "QR", roles: ["Docente", "Administrador"] as const },
+  { href: "/marcar", label: "Marcar", roles: ["Alumno", "Tesorera"] as const },
   { href: "/escanear", label: "Escanear", roles: ["Docente", "Administrador"] as const },
   { href: "/usuarios", label: "Usuarios", roles: ["Administrador"] as const },
 ];
