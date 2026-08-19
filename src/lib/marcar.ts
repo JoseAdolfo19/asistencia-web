@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/session";
-import { estadoClase, esPrimeraClase, esAlumno, fechaHoy, diaHoy, horaAhora, normalizeName, aMinutos } from "@/lib/estado";
+import { estadoClase, esPrimeraClase, esAlumno, esAlumnoRegistrado, fechaHoy, diaHoy, horaAhora, normalizeName, aMinutos } from "@/lib/estado";
 import { permitirRateLimit } from "@/lib/rateLimit";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { qrSecret, firmaValida, generarFirmaQR } from "@/lib/qr";
@@ -32,9 +32,9 @@ export async function resolverAlumno(nombre: string): Promise<
   if (error) return { ok: false, error: "Error buscando alumno" };
 
   const target = normalizeName(q);
-  const candidatos = (alumnos ?? []).filter(
-    (a) => normalizeName(a.nombres + " " + a.apellidos) === target
-  );
+  const candidatos = (alumnos ?? [])
+    .filter((a) => esAlumnoRegistrado(a.id))
+    .filter((a) => normalizeName(a.nombres + " " + a.apellidos) === target);
 
   if (candidatos.length === 0) return { ok: false, error: "No se encontró un alumno con ese nombre" };
   if (candidatos.length > 1) return { ok: false, error: "Hay varios alumnos con ese nombre; sé más específico" };
@@ -53,7 +53,7 @@ export async function getQrToken(
 ): Promise<QrTokenResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sesión expirada" };
-  if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden generar QR" };
+  if (!esAlumno(session.rol) || !esAlumnoRegistrado(session.id)) return { ok: false, error: "Solo alumnos pueden generar QR" };
 
   // Máximo 12 tokens por minuto por alumno (el QR se refresca cada 30s)
   if (!(await permitirRateLimit(`qr:${session.id}`, 12, 60_000))) {
@@ -63,13 +63,18 @@ export async function getQrToken(
   const id = Number(claseId);
   if (!id) return { ok: false, error: "Clase inválida" };
 
-  const { data: cursos } = await supabaseAdmin
-    .from("cursos")
-    .select("nombre")
-    .eq("asistencia_obligatoria", false);
+  const [cursosRes, horarioRes, abiertasRes, horarioHoyRes] = await Promise.all([
+    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
+    supabaseAdmin.from("horario").select("*").eq("id", id).limit(1),
+    supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", fechaHoy()),
+    supabaseAdmin.from("horario").select("*").eq("dia", diaHoy()),
+  ]);
+  const cursos = cursosRes.data;
+  const horario = horarioRes.data;
+  const abiertas = abiertasRes.data;
+  const horarioHoy = horarioHoyRes.data;
   const excluidos = new Set((cursos ?? []).map((c) => normalizeName(c.nombre)));
 
-  const { data: horario } = await supabaseAdmin.from("horario").select("*").eq("id", id).limit(1);
   const h = horario?.[0];
   if (!h) return { ok: false, error: "Clase no encontrada" };
 
@@ -82,19 +87,10 @@ export async function getQrToken(
     return { ok: false, error: "Curso no coincide con la clase activa" };
   }
 
-  const { data: abiertas } = await supabaseAdmin
-    .from("clases_abiertas")
-    .select("curso,hora_abierta")
-    .eq("fecha", hoyStr);
   const aperturaManual = (abiertas ?? []).find(
     (a) => normalizeName(a.curso) === normalizeName(h.curso)
   )?.hora_abierta ?? null;
 
-  // Para saber si esta clase es la primera del día, cargamos todo el horario de hoy
-  const { data: horarioHoy } = await supabaseAdmin
-    .from("horario")
-    .select("*")
-    .eq("dia", hoy);
   const primera = esPrimeraClase(h, horarioHoy ?? [], hoy, excluidos);
 
   const est = estadoClase(h, aperturaManual, primera);
@@ -175,29 +171,29 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
   const ahora = horaAhora();
   const ahoraMin = aMinutos(ahora);
 
-  const { data: configRows } = await supabaseAdmin.from("configuracion").select("*").limit(1);
+  // Lecturas independientes en paralelo (antes eran secuenciales)
+  const [configRes, cursosRes, horarioRes, abiertasRes, asisRes, alumnosRes] = await Promise.all([
+    supabaseAdmin.from("configuracion").select("*").limit(1),
+    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
+    supabaseAdmin.from("horario").select("*"),
+    supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", hoyStr),
+    supabaseAdmin.from("asistencia").select("alumno,curso,estado").eq("fecha", hoyStr),
+    supabaseAdmin.from("alumnos").select("id").in("rol", ["Alumno", "Tesorera"]),
+  ]);
+  const configRows = configRes.data;
+  const cursos = cursosRes.data;
+  const horario = horarioRes.data;
+  const abiertas = abiertasRes.data;
+  const asisHoy = asisRes.data;
+  const alumnos = alumnosRes.data;
   const montoTardanza = Number(configRows?.[0]?.multa_tardanza) || 1;
 
-  const { data: cursos } = await supabaseAdmin
-    .from("cursos")
-    .select("nombre")
-    .eq("asistencia_obligatoria", false);
   const excluidos = new Set((cursos ?? []).map((c) => normalizeName(c.nombre)));
 
-  const { data: horario } = await supabaseAdmin.from("horario").select("*");
-
-  const { data: abiertas } = await supabaseAdmin
-    .from("clases_abiertas")
-    .select("curso,hora_abierta")
-    .eq("fecha", hoyStr);
   const aperturaPorCurso = new Map<string, string>();
   for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
 
   // Registros de hoy: quiénes llegaron (Presente/Tardanza) y quiénes marcaron cada curso
-  const { data: asisHoy } = await supabaseAdmin
-    .from("asistencia")
-    .select("alumno,curso,estado")
-    .eq("fecha", hoyStr);
   const llegaronHoy = new Set<string>();
   const marcaronCurso = new Map<string, Set<string>>();
   for (const a of asisHoy ?? []) {
@@ -211,8 +207,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
     (h) => String(h.dia) === hoy && !excluidos.has(normalizeName(h.curso))
   ) as ClaseCierre[];
 
-  const { data: alumnos } = await supabaseAdmin.from("alumnos").select("id").in("rol", ["Alumno", "Tesorera"]);
-  const alumnosIds = (alumnos ?? []).map((a) => a.id);
+  const alumnosIds = (alumnos ?? []).map((a) => a.id).filter(esAlumnoRegistrado);
 
   const clasesCerradas: string[] = [];
   let tardanzas = 0;
@@ -340,6 +335,7 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
   const session = await getSession();
   if (!session) return { ok: false, error: "Sesión expirada" };
   if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores pueden marcar asistencia" };
+  if (!esAlumnoRegistrado(String(alumnoId || ""))) return { ok: false, error: "Alumno no válido para marcar asistencia" };
 
   // Máximo 30 marcaciones por minuto por docente (protege contra spam)
   if (!(await permitirRateLimit(`marcar:${session.id}`, 30, 60_000))) {
@@ -352,23 +348,23 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
   const t = String(token || "").trim();
   if (!t) return { ok: false, error: "Token vacío" };
 
-  const { data: configRows } = await supabaseAdmin.from("configuracion").select("*").limit(1);
+  const [configRes, cursosRes, horarioRes, abiertasRes] = await Promise.all([
+    supabaseAdmin.from("configuracion").select("*").limit(1),
+    supabaseAdmin.from("cursos").select("nombre").eq("asistencia_obligatoria", false),
+    supabaseAdmin.from("horario").select("*"),
+    supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", fechaHoy()),
+  ]);
+  const configRows = configRes.data;
+  const cursos = cursosRes.data;
+  const horario = horarioRes.data;
+  const abiertas = abiertasRes.data;
   const montoTardanza = Number(configRows?.[0]?.multa_tardanza) || 1;
 
-  const { data: cursos } = await supabaseAdmin
-    .from("cursos")
-    .select("nombre")
-    .eq("asistencia_obligatoria", false);
   const excluidos = new Set((cursos ?? []).map((c) => normalizeName(c.nombre)));
 
-  const { data: horario } = await supabaseAdmin.from("horario").select("*");
   const hoy = diaHoy();
   const hoyStr = fechaHoy();
 
-  const { data: abiertas } = await supabaseAdmin
-    .from("clases_abiertas")
-    .select("curso,hora_abierta")
-    .eq("fecha", hoyStr);
   const aperturaPorCurso = new Map<string, string>();
   for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
 

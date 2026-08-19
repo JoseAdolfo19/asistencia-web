@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      actividad_alumnos: {
+        Row: {
+          actividad_id: number
+          alumno: string
+          id: number
+          participacion: boolean
+        }
+        Insert: {
+          actividad_id: number
+          alumno: string
+          id?: number
+          participacion?: boolean
+        }
+        Update: {
+          actividad_id?: number
+          alumno?: string
+          id?: number
+          participacion?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actividad_alumnos_actividad_id_fkey"
+            columns: ["actividad_id"]
+            isOneToOne: false
+            referencedRelation: "actividades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actividad_alumnos_alumno_fkey"
+            columns: ["alumno"]
+            isOneToOne: false
+            referencedRelation: "alumnos"
+            referencedColumns: ["id"]
+          },
+        ]
+      },
+      actividades: {
+        Row: {
+          creado_en: string
+          descripcion: string | null
+          estado: string
+          fecha: string
+          id: number
+          nombre: string
+        }
+        Insert: {
+          creado_en?: string
+          descripcion?: string | null
+          estado?: string
+          fecha: string
+          id?: number
+          nombre: string
+        }
+        Update: {
+          creado_en?: string
+          descripcion?: string | null
+          estado?: string
+          fecha?: string
+          id?: number
+          nombre?: string
+        }
+        Relationships: []
+      },
       alumnos: {
         Row: {
           apellidos: string
@@ -279,6 +342,7 @@ export type Database = {
       }
       multas: {
         Row: {
+          actividad_id: number | null
           alumno: string
           asistencia_id: number | null
           estado: string
@@ -289,6 +353,7 @@ export type Database = {
           tipo: string
         }
         Insert: {
+          actividad_id?: number | null
           alumno: string
           asistencia_id?: number | null
           estado?: string
@@ -299,6 +364,7 @@ export type Database = {
           tipo: string
         }
         Update: {
+          actividad_id?: number | null
           alumno?: string
           asistencia_id?: number | null
           estado?: string

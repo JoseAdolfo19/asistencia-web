@@ -11,8 +11,10 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/asistencia", label: "Asistencia" },
   { href: "/multas", label: "Multas" },
+  { href: "/actividades", label: "Actividades" },
   { href: "/qr", label: "QR" },
   { href: "/escanear", label: "Escanear", roles: ["Docente", "Administrador"] as const },
+  { href: "/usuarios", label: "Usuarios", roles: ["Administrador"] as const },
 ];
 
 export default function Nav({ user }: { user: SessionUser }) {

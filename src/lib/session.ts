@@ -1,6 +1,7 @@
 import "server-only";
 
 import crypto from "crypto";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -39,7 +40,7 @@ export async function createSession(user: SessionUser): Promise<void> {
   });
 }
 
-export async function getSession(): Promise<SessionUser | null> {
+export const getSession = cache(async function getSession(): Promise<SessionUser | null> {
   const store = await cookies();
   const raw = store.get(COOKIE_NAME)?.value;
   if (!raw) return null;
@@ -67,7 +68,7 @@ export async function getSession(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function destroySession(): Promise<void> {
   const store = await cookies();

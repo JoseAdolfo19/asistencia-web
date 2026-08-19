@@ -44,6 +44,15 @@ export function esAlumno(rol: string): boolean {
   return rol === "Alumno" || rol === "Tesorera";
 }
 
+// Solo los alumnos registrados AL001..AL032 se marcan asistencia o participación.
+// Excluye cuentas de docentes (D001..), admin (AL033) u otras.
+export function esAlumnoRegistrado(id: string): boolean {
+  const m = /^AL(\d{3})$/.exec(String(id || "").trim().toUpperCase());
+  if (!m) return false;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 32;
+}
+
 export function fechaHoy(): string {
   const p = peruParts();
   return `${p.y}-${p.m}-${p.d}`;

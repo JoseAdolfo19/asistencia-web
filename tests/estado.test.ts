@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect } from "vitest";
-import { estadoClase, esPrimeraClase, aMinutos, normalizeName } from "@/lib/estado";
+import { estadoClase, esPrimeraClase, aMinutos, normalizeName, esAlumnoRegistrado } from "@/lib/estado";
 
 // estado.ts usa la hora real de Perú; para pruebas deterministas probamos
 // aMinutos y normalizeName (puras) y la lógica de estadoClase con inputs fijos
@@ -52,6 +52,24 @@ describe("esPrimeraClase", () => {
 
   it("devuelve false cuando no hay clases de ese día", () => {
     expect(esPrimeraClase(todas[0], todas, "Martes", excluidos)).toBe(false);
+  });
+});
+
+describe("esAlumnoRegistrado", () => {
+  it("acepta solo AL001..AL032", () => {
+    expect(esAlumnoRegistrado("AL001")).toBe(true);
+    expect(esAlumnoRegistrado("AL010")).toBe(true);
+    expect(esAlumnoRegistrado("AL032")).toBe(true);
+    expect(esAlumnoRegistrado("al032")).toBe(true);
+  });
+
+  it("rechaza fuera de rango y otras cuentas", () => {
+    expect(esAlumnoRegistrado("AL000")).toBe(false);
+    expect(esAlumnoRegistrado("AL033")).toBe(false);
+    expect(esAlumnoRegistrado("D001")).toBe(false);
+    expect(esAlumnoRegistrado("AL0010")).toBe(false);
+    expect(esAlumnoRegistrado("")).toBe(false);
+    expect(esAlumnoRegistrado("AL")).toBe(false);
   });
 });
 
