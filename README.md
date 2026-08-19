@@ -231,6 +231,7 @@ src/
 │   ├── page.tsx                # Redirige a /horario o /login
 │   ├── login/                  # Ruta de login (formulario en components/panels)
 │   ├── cambiar-password/       # Ruta de cambio de contraseña obligatorio
+│   ├── recuperar/              # Ruta de recuperación de contraseña (correo + DNI)
 │   └── (app)/
 │       ├── layout.tsx          # Layout protegido + Nav
 │       ├── horario/            # Tabla semanal + enlace "Editar horario" (admin)
@@ -248,6 +249,7 @@ src/
 │   ├── panels/                 # Lógica por página (client)
 │   │   ├── LoginForm.tsx
 │   │   ├── CambiarPasswordForm.tsx
+│   │   ├── RecuperarPanel.tsx  # Formulario de recuperación de contraseña (2 pasos)
 │   │   ├── HorarioEditor.tsx
 │   │   ├── DashboardPanel.tsx
 │   │   ├── AsistenciaPanel.tsx
@@ -268,6 +270,7 @@ src/
     ├── supabaseAdmin.ts        # Cliente service_role tipado (escrituras), con timeout 45s
     ├── database.types.ts       # Tipos generados (supabase gen types)
     ├── auth.ts                 # loginAction / logoutAction / cambiarPasswordAction / cerrarSesionTodosDispositivos
+    ├── recuperar.ts            # verificarIdentidad / recuperarContrasena (recuperación autoservicio: correo + DNI)
     ├── session.ts              # Cookie de sesión httpOnly (incluye session_version)
     ├── estado.ts               # Hora Perú, estados de clase, esAlumnoRegistrado (AL001–AL032)
     ├── exportar.ts             # Genera archivos .xls de 2 hojas (exportar a Excel)

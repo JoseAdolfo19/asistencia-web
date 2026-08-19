@@ -13,6 +13,13 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 | `cambiarPasswordAction(actual, nueva)` | Autenticado | Verifica la actual, valida la nueva (mín 10, mayúscula/minúscula/número/símbolo, no DNI/nombre), actualiza hash+salt y recrea la sesión. |
 | `cerrarSesionTodosDispositivos()` | Administrador | Incrementa `session_version` del usuario: invalida todas sus cookies (incluida la actual). |
 
+## recuperar.ts
+
+| Acción | Rol | Qué hace |
+|---|---|---|
+| `verificarIdentidad(correo, dni)` | Público | Verifica que el correo y el DNI coincidan con un usuario activo. Respuesta genérica para no revelar correos existentes. Rate limit: 5/min por correo. |
+| `recuperarContrasena(correo, dni, nueva)` | Público | Re-confirma correo+DNI en servidor, valida la nueva contraseña (mín 10, mayúscula/minúscula/número/símbolo, no DNI/nombre) y actualiza hash+salt, limpiando intentos/bloqueos de login. |
+
 ## marcar.ts
 
 | Acción | Rol | Qué hace |
