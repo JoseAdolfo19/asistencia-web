@@ -76,6 +76,7 @@ Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`sr
   - **Falta (sin multa)** si el alumno no llegó en todo el día.
   - Si un alumno quedó en Falta en una clase anterior pero luego llega a otra clase del día, `subirFaltasSiLlego()` sube su Falta a Tardanza y genera la multa.
   - Se ejecuta como máximo **una vez por minuto** (throttle en `src/lib/marcar.ts`) mientras el docente está en `/escanear` y antes de cada marcación; es idempotente, así que no duplica registros. Los inserts por clase se hacen en lote (2 consultas por clase en vez de 2 por alumno).
+  - Los cursos con `asistencia_obligatoria = false` (como el **Taller de fortalecimiento**) quedan excluidos de este proceso: su QR queda como registro informal, sin generar Falta/Tardanza ni multas.
 - **Apertura manual:** si el docente llega tarde, presiona "Abrir clase": se crea un registro en `clases_abiertas` con la hora de apertura real, y los alumnos presentes marcan Presente sin caer en Tardanza.
 
 ### Marcación invertida (el alumno escanea el QR del docente)
