@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { verificarIdentidad, recuperarContrasena } from "@/lib/recuperar";
+import { contrasenaFuerte } from "@/lib/password";
 import Button from "@/components/ui/Button";
+import PasswordStrength from "@/components/ui/PasswordStrength";
 
 export default function RecuperarPanel() {
   const router = useRouter();
@@ -100,16 +102,19 @@ export default function RecuperarPanel() {
               <input
                 type="password"
                 required
+                minLength={10}
                 value={nueva}
                 onChange={(e) => setNueva(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
+              <PasswordStrength value={nueva} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">Confirmar contraseña</label>
               <input
                 type="password"
                 required
+                minLength={10}
                 value={confirma}
                 onChange={(e) => setConfirma(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
@@ -122,12 +127,12 @@ export default function RecuperarPanel() {
               <Button variant="secondary" type="button" onClick={() => setVerificado(null)}>
                 Volver
               </Button>
-              <Button type="submit" disabled={loading || nueva.length < 8}>
+              <Button type="submit" disabled={loading || !contrasenaFuerte(nueva)}>
                 {loading ? "Guardando..." : "Guardar contraseña"}
               </Button>
             </div>
             <p className="text-center text-xs text-slate-400">
-              Mínimo 8 caracteres; no puede ser tu DNI ni tu nombre.
+              Mínimo 10 caracteres con mayúscula, minúscula, número y símbolo.
             </p>
           </form>
         )}

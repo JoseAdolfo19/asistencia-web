@@ -10,7 +10,7 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 |---|---|---|
 | `loginAction(correo, password)` | Público | Valida credenciales (hash+salt), aplica rate limiting (5 intentos → bloqueo 15 min) y crea la cookie de sesión. |
 | `logoutAction()` | Cualquiera | Elimina la cookie de sesión. |
-| `cambiarPasswordAction(actual, nueva)` | Autenticado | Verifica la actual, valida la nueva (mín 8, no DNI/nombre), actualiza hash+salt y recrea la sesión. |
+| `cambiarPasswordAction(actual, nueva)` | Autenticado | Verifica la actual, valida la nueva (mín 10, mayúscula/minúscula/número/símbolo, no DNI/nombre), actualiza hash+salt y recrea la sesión. |
 | `cerrarSesionTodosDispositivos()` | Administrador | Incrementa `session_version` del usuario: invalida todas sus cookies (incluida la actual). |
 
 ## marcar.ts
@@ -38,7 +38,7 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 | Acción | Rol | Qué hace |
 |---|---|---|
 | `actualizarPerfil(id, datos)` | Administrador | Actualiza nombres, apellidos, correo, rol y estado de un usuario. Impide que el admin se cambie su propio rol y duplica-correos. |
-| `resetearPassword(id, nueva, forzarCambio)` | Administrador | Restablece la contraseña de un usuario (mín 8, no DNI/nombre) y opcionalmente exige cambio en el próximo ingreso (`debe_cambiar_password`). |
+| `resetearPassword(id, nueva, forzarCambio)` | Administrador | Restablece la contraseña de un usuario (mín 10, mayúscula/minúscula/número/símbolo, no DNI/nombre) y opcionalmente exige cambio en el próximo ingreso (`debe_cambiar_password`). |
 
 ## multas.ts
 

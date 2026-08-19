@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { actualizarPerfil, resetearPassword } from "@/lib/admin";
+import { contrasenaFuerte } from "@/lib/password";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import PasswordStrength from "@/components/ui/PasswordStrength";
 
 type Usuario = {
   id: string;
@@ -269,15 +271,19 @@ export default function UsuariosPanel() {
             <h2 className="mb-1 font-semibold text-slate-800">
               Cambiar contraseña de {pwUsuario.id} ({pwUsuario.nombres} {pwUsuario.apellidos})
             </h2>
-            <p className="mb-3 text-xs text-slate-500">Mínimo 8 caracteres; no puede ser el DNI ni el nombre.</p>
+            <p className="mb-3 text-xs text-slate-500">
+              Mínimo 10 caracteres con mayúscula, minúscula, número y símbolo.
+            </p>
             <div>
               <label className="block text-xs font-medium text-slate-600">Nueva contraseña</label>
               <input
                 type="password"
                 value={pwNueva}
+                minLength={10}
                 onChange={(e) => setPwNueva(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
+              <PasswordStrength value={pwNueva} />
             </div>
             <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -290,7 +296,7 @@ export default function UsuariosPanel() {
             </label>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setPwUsuario(null)}>Cancelar</Button>
-              <Button onClick={guardarPassword} disabled={pwGuardando || pwNueva.trim().length < 8}>
+              <Button onClick={guardarPassword} disabled={pwGuardando || !contrasenaFuerte(pwNueva)}>
                 {pwGuardando ? "Guardando..." : "Actualizar contraseña"}
               </Button>
             </div>

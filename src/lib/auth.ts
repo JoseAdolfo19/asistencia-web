@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { hashPassword, randomSalt } from "@/lib/crypto";
+import { validarNuevaContrasena } from "@/lib/password";
 import { createSession, getSession, SessionUser, destroySession } from "@/lib/session";
 import { registrarAuditoria } from "@/lib/auditoria";
 
@@ -169,12 +170,9 @@ export async function cambiarPasswordAction(
   if (hashPassword(actual, salt) !== hash) return { ok: false, error: "Contraseña actual incorrecta" };
 
   const trimmed = nueva.trim();
-  if (trimmed.length < 8) return { ok: false, error: "La nueva contraseña debe tener al menos 8 caracteres" };
   if (trimmed === actual) return { ok: false, error: "La nueva contraseña no puede ser igual a la actual" };
-  if (trimmed === String(user.dni || "")) return { ok: false, error: "No puedes usar tu DNI como contraseña" };
-  const nombreMayus = String(user.nombres || "").toUpperCase().split(" ")[0];
-  if (nombreMayus && trimmed.toUpperCase() === nombreMayus)
-    return { ok: false, error: "No puedes usar tu nombre como contraseña" };
+  const errValidacion = validarNuevaContrasena(trimmed, user.dni, user.nombres);
+  if (errValidacion) return { ok: false, error: errValidacion };
 
   const nuevoSalt = randomSalt();
   const nuevoHash = hashPassword(trimmed, nuevoSalt);

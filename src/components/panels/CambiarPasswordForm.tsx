@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cambiarPasswordAction } from "@/lib/auth";
+import { contrasenaFuerte } from "@/lib/password";
 import Button from "@/components/ui/Button";
+import PasswordStrength from "@/components/ui/PasswordStrength";
 
 export default function CambiarPasswordForm() {
   const router = useRouter();
@@ -54,15 +56,13 @@ export default function CambiarPasswordForm() {
           <input
             type="password"
             required
-            minLength={8}
+            minLength={10}
             autoComplete="new-password"
             value={nueva}
             onChange={(e) => setNueva(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
           />
-          <p className="mt-1 text-xs text-slate-400">
-            Mínimo 8 caracteres. No uses tu DNI ni tu nombre.
-          </p>
+          <PasswordStrength value={nueva} />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700">
@@ -71,7 +71,7 @@ export default function CambiarPasswordForm() {
           <input
             type="password"
             required
-            minLength={8}
+            minLength={10}
             autoComplete="new-password"
             value={confirmar}
             onChange={(e) => setConfirmar(e.target.value)}
@@ -81,7 +81,11 @@ export default function CambiarPasswordForm() {
         {error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
-        <Button type="submit" disabled={loading} size="lg">
+        <Button
+          type="submit"
+          disabled={loading || !contrasenaFuerte(nueva)}
+          size="lg"
+        >
           {loading ? "Guardando..." : "Guardar contraseña"}
         </Button>
       </form>

@@ -161,6 +161,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 - **Botón tesorera "multa por buzo"**: en el panel de Multas, la tesorera/admin selecciona un alumno y crea una multa tipo **Buzo** (monto `multa_buzo`) que el alumno ve en su panel.
 - **Justificación de faltas/tardanzas**: docente, tesorera o admin pueden marcar una Falta/Tardanza como **justificada** (con motivo) desde el panel de Asistencia. El registro muestra el badge "Justificada", la multa asociada se **anula** (estado `Anulada`) y no cuenta como pendiente ni en el resumen de multas.
 - **Conexiones con timeout**: los clientes de Supabase (`supabase.ts` y `supabaseAdmin.ts`) usan `AbortSignal.timeout(45 s)` para que ninguna petición se cuelgue.
+- **Contraseñas seguras**: todos los formularios de contraseña (cambio, recuperación, admin) exigen mínimo 10 caracteres con mayúscula, minúscula, número y símbolo, con un **verificador de fortaleza en vivo** (`src/components/ui/PasswordStrength.tsx` + reglas compartidas en `src/lib/password.ts`).
 
 ## 5f. Control de Actividades
 
@@ -178,7 +179,7 @@ En **Usuarios** (`/usuarios`, solo administrador):
 
 - Tabla con todos los usuarios (código, nombre, correo, rol, estado, estado de contraseña) y búsqueda.
 - **Editar perfil**: nombres, apellidos, correo, rol y estado (Activo/Inactivo). Protegido: el admin no puede cambiarse su propio rol, y el correo no puede duplicarse.
-- **Cambiar contraseña**: restablece la clave de cualquier usuario, con opción de **exigir cambio en el próximo ingreso** (`debe_cambiar_password`). Valida mínimo 8 caracteres y prohíbe DNI o primer nombre.
+- **Cambiar contraseña**: restablece la clave de cualquier usuario, con opción de **exigir cambio en el próximo ingreso** (`debe_cambiar_password`). Valida fortaleza (mínimo 10 caracteres con mayúscula, minúscula, número y símbolo) y prohíbe DNI o primer nombre.
 - Servidor: `src/lib/admin.ts` (`actualizarPerfil`, `resetearPassword`). Todo queda en auditoría.
 
 ---
@@ -374,3 +375,5 @@ npm run dev        # http://localhost:3000
 34. **Optimización de rendimiento**: cache TTL de 60 s para config/horario/cursos, cierre automático con throttle de 1/min y inserts en lote, lecturas en paralelo y timeout de 45 s en las conexiones Supabase.
 35. **Marcación invertida**: el docente muestra el QR de la clase (`/qr`, token sin alumno) y el alumno lo escanea desde **Marcar** (`/marcar`); `/escanear` queda como respaldo. Se elimina el QR por alumno.
 36. **Gestión de Usuarios** (`/usuarios`): edición de perfil y restablecimiento de contraseñas (solo admin), con opción de exigir cambio en el próximo ingreso.
+37. **Recuperación de contraseña** (`/recuperar`): link en el login, verificación de identidad con correo + DNI y cambio de clave autoservicio.
+38. **Contraseñas seguras**: mínimo 10 caracteres con mayúscula, minúscula, número y símbolo, con verificador de fortaleza en vivo en todos los formularios.
