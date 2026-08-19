@@ -27,10 +27,10 @@ type ClaseParaToken = {
 type BaseDia = {
   montoTardanza: number;
   lista: ClaseParaToken[];
-  excluidos: Set<string>;
+  opcionales: Set<string>;
 };
 
-// Datos estables del día (config, cursos excluidos y horario). Se cachean un minuto
+// Datos estables del día (config, cursos opcionales y horario). Se cachean un minuto
 // para no repetir lecturas en cada escaneo; lo mutable (clases_abiertas, asistencia)
 // siempre se lee fresco.
 let cacheBase: { ts: number; base: BaseDia } | null = null;
@@ -46,13 +46,15 @@ async function cargarBaseDia(): Promise<BaseDia> {
   ]);
 
   const montoTardanza = Number(configRes.data?.[0]?.multa_tardanza) || 1;
-  const excluidos = new Set((cursosRes.data ?? []).map((c) => normalizeName(c.nombre)));
+  // Cursos con asistencia_obligatoria = false: tienen QR, pero la asistencia es
+  // opcional (el cierre automático no penaliza por no marcar).
+  const opcionales = new Set((cursosRes.data ?? []).map((c) => normalizeName(c.nombre)));
   const hoy = diaHoy();
   const lista = ((horarioRes.data ?? []) as ClaseParaToken[]).filter(
-    (h) => String(h.dia) === hoy && !excluidos.has(normalizeName(h.curso))
+    (h) => String(h.dia) === hoy
   );
 
-  const base: BaseDia = { montoTardanza, lista, excluidos };
+  const base: BaseDia = { montoTardanza, lista, opcionales };
   cacheBase = { ts: Date.now(), base };
   return base;
 }
@@ -123,7 +125,7 @@ async function tokenDeClaseActiva(
     (a) => normalizeName(a.curso) === normalizeName(h.curso)
   )?.hora_abierta ?? null;
 
-  const primera = esPrimeraClase(h, base.lista, diaHoy(), base.excluidos);
+  const primera = esPrimeraClase(h, base.lista, diaHoy(), new Set());
 
   const est = estadoClase(h, aperturaManual, primera);
   if (est !== "Activa" && est !== "Cerrada") {
@@ -256,7 +258,11 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
     marcaronCurso.get(k)!.add(a.alumno);
   }
 
-  const clasesHoy = base.lista as ClaseCierre[];
+  // Cierra y penaliza solo los cursos obligatorios: los opcionales (Taller)
+  // tienen QR pero el cierre automático no genera Falta/Tardanza ni multas.
+  const clasesHoy = (base.lista as ClaseCierre[]).filter(
+    (h) => !base.opcionales.has(normalizeName(h.curso))
+  );
 
   const alumnosIds = (alumnos ?? []).map((a) => a.id).filter(esAlumnoRegistrado);
 
@@ -395,7 +401,7 @@ async function marcarPorToken(
   const t = String(token || "").trim();
   if (!t) return { ok: false, error: "Token vacío" };
 
-  const { montoTardanza, lista, excluidos } = await cargarBaseDia();
+  const { montoTardanza, lista } = await cargarBaseDia();
 
   const { data: abiertas } = await supabaseAdmin
     .from("clases_abiertas")
@@ -411,7 +417,7 @@ async function marcarPorToken(
   let encontrada: { horario: { id: number; curso: string }; estado: string } | null = null;
   for (const h of lista) {
     const aperturaManual = aperturaPorCurso.get(normalizeName(h.curso)) ?? null;
-    const primera = esPrimeraClase(h, lista, hoy, excluidos);
+    const primera = esPrimeraClase(h, lista, hoy, new Set());
     const est = estadoClase(h, aperturaManual, primera);
     if (est !== "Activa" && est !== "Cerrada") continue;
     if (firmaValida(t, h.id, h.curso, hoyStr, qrSecret(), Date.now())) {
