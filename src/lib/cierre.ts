@@ -41,15 +41,16 @@ export function planificarCierre(
 }
 
 export type FaltaPendiente = { id: number; alumno: string; curso: string };
-export type MultaExistente = { motivo: string | null };
+export type MultaExistente = { motivo: string | null; asistencia_id: number | null };
 
 export type PlanSubirFaltas = {
   actualizar: { id: number; curso: string }[];
-  multasNuevas: { alumno: string; curso: string; motivo: string }[];
+  multasNuevas: { alumno: string; curso: string; motivo: string; asistenciaId: number }[];
 };
 
 // Para un alumno que sí llegó hoy, sube a Tardanza sus Faltas del día y
-// decide qué multas de tardanza crear (evitando duplicados por curso).
+// decide qué multas de tardanza crear (evitando duplicados por curso o por
+// asistencia ya vinculada a una multa).
 export function planificarSubirFaltas(
   faltas: FaltaPendiente[],
   multas: MultaExistente[],
@@ -57,15 +58,17 @@ export function planificarSubirFaltas(
   motivoBase: (curso: string) => string
 ): PlanSubirFaltas {
   const actualizar: { id: number; curso: string }[] = [];
-  const multasNuevas: { alumno: string; curso: string; motivo: string }[] = [];
+  const multasNuevas: { alumno: string; curso: string; motivo: string; asistenciaId: number }[] = [];
 
   for (const f of faltas) {
     if (f.alumno !== alumnoId) continue;
     actualizar.push({ id: f.id, curso: f.curso });
 
-    const yaExiste = multas.some((m) => (m.motivo ?? "").includes(f.curso));
+    const yaExiste = multas.some(
+      (m) => m.asistencia_id === f.id || (m.motivo ?? "").includes(f.curso)
+    );
     if (!yaExiste) {
-      multasNuevas.push({ alumno: alumnoId, curso: f.curso, motivo: motivoBase(f.curso) });
+      multasNuevas.push({ alumno: alumnoId, curso: f.curso, motivo: motivoBase(f.curso), asistenciaId: f.id });
     }
   }
 

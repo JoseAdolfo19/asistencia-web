@@ -18,6 +18,7 @@ type Clase = {
 type HorarioEditorProps = {
   clases: Clase[];
   cursos: string[];
+  docentes: string[];
   dias: string[];
 };
 
@@ -26,7 +27,7 @@ const HORAS = [
   "11:30", "12:10", "12:50", "13:30", "14:00", "15:00", "16:00",
 ];
 
-export default function HorarioEditor({ clases, cursos, dias }: HorarioEditorProps) {
+export default function HorarioEditor({ clases, cursos, docentes, dias }: HorarioEditorProps) {
   const router = useRouter();
   const [editing, setEditing] = useState<Clase | null>(null);
   const [creating, setCreating] = useState(false);
@@ -173,11 +174,16 @@ export default function HorarioEditor({ clases, cursos, dias }: HorarioEditorPro
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600">Docente</label>
-              <input
+              <select
                 value={form.docente}
                 onChange={(e) => setForm({ ...form, docente: e.target.value })}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
+              >
+                <option value="">— Sin docente —</option>
+                {docentes.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="mt-4 flex gap-2">

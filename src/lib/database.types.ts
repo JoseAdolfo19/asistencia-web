@@ -280,6 +280,7 @@ export type Database = {
       multas: {
         Row: {
           alumno: string
+          asistencia_id: number | null
           estado: string
           fecha: string
           id: number
@@ -289,6 +290,7 @@ export type Database = {
         }
         Insert: {
           alumno: string
+          asistencia_id?: number | null
           estado?: string
           fecha: string
           id?: number
@@ -298,6 +300,7 @@ export type Database = {
         }
         Update: {
           alumno?: string
+          asistencia_id?: number | null
           estado?: string
           fecha?: string
           id?: number
@@ -305,7 +308,15 @@ export type Database = {
           motivo?: string | null
           tipo?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "multas_asistencia_id_fkey"
+            columns: ["asistencia_id"]
+            isOneToOne: false
+            referencedRelation: "asistencia"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rate_limits: {
         Row: {

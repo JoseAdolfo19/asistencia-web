@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/session";
-import { estadoClase, fechaHoy, diaHoy, horaAhora, normalizeName, aMinutos } from "@/lib/estado";
+import { estadoClase, esPrimeraClase, esAlumno, fechaHoy, diaHoy, horaAhora, normalizeName, aMinutos } from "@/lib/estado";
 import { permitirRateLimit } from "@/lib/rateLimit";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { qrSecret, firmaValida, generarFirmaQR } from "@/lib/qr";
@@ -27,7 +27,7 @@ export async function resolverAlumno(nombre: string): Promise<
   const { data: alumnos, error } = await supabaseAdmin
     .from("alumnos")
     .select("id,nombres,apellidos")
-    .eq("rol", "Alumno");
+    .in("rol", ["Alumno", "Tesorera"]);
 
   if (error) return { ok: false, error: "Error buscando alumno" };
 
@@ -53,7 +53,7 @@ export async function getQrToken(
 ): Promise<QrTokenResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sesión expirada" };
-  if (session.rol !== "Alumno") return { ok: false, error: "Solo alumnos pueden generar QR" };
+  if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden generar QR" };
 
   // Máximo 12 tokens por minuto por alumno (el QR se refresca cada 30s)
   if (!(await permitirRateLimit(`qr:${session.id}`, 12, 60_000))) {
@@ -62,9 +62,6 @@ export async function getQrToken(
 
   const id = Number(claseId);
   if (!id) return { ok: false, error: "Clase inválida" };
-
-  const { data: configRows } = await supabaseAdmin.from("configuracion").select("*").limit(1);
-  const tolerancia = Number(configRows?.[0]?.tiempo_cierre_qr) || 5;
 
   const { data: cursos } = await supabaseAdmin
     .from("cursos")
@@ -93,7 +90,14 @@ export async function getQrToken(
     (a) => normalizeName(a.curso) === normalizeName(h.curso)
   )?.hora_abierta ?? null;
 
-  const est = estadoClase(h, tolerancia, aperturaManual);
+  // Para saber si esta clase es la primera del día, cargamos todo el horario de hoy
+  const { data: horarioHoy } = await supabaseAdmin
+    .from("horario")
+    .select("*")
+    .eq("dia", hoy);
+  const primera = esPrimeraClase(h, horarioHoy ?? [], hoy, excluidos);
+
+  const est = estadoClase(h, aperturaManual, primera);
   if (est !== "Activa") return { ok: false, error: "La clase no está activa en este momento" };
 
   const token = generarFirmaQR(h.id, h.curso, hoyStr, seed, qrSecret());
@@ -127,13 +131,13 @@ async function subirFaltasSiLlego(
 
   const { data: multas } = await supabaseAdmin
     .from("multas")
-    .select("motivo")
+    .select("motivo,asistencia_id")
     .eq("alumno", alumnoId)
     .eq("fecha", hoyStr);
 
   const plan = planificarSubirFaltas(
     (faltas ?? []) as FaltaPendiente[],
-    (multas ?? []) as { motivo: string | null }[],
+    (multas ?? []) as { motivo: string | null; asistencia_id: number | null }[],
     alumnoId,
     (curso) => "No escaneó su QR en " + curso
   );
@@ -153,6 +157,7 @@ async function subirFaltasSiLlego(
       monto,
       fecha: hoyStr,
       estado: "Pendiente",
+      asistencia_id: m.asistenciaId,
     });
     if (e2) errores.push(`Multa ${m.curso}: ${e2.message}`);
   }
@@ -206,7 +211,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
     (h) => String(h.dia) === hoy && !excluidos.has(normalizeName(h.curso))
   ) as ClaseCierre[];
 
-  const { data: alumnos } = await supabaseAdmin.from("alumnos").select("id").eq("rol", "Alumno");
+  const { data: alumnos } = await supabaseAdmin.from("alumnos").select("id").in("rol", ["Alumno", "Tesorera"]);
   const alumnosIds = (alumnos ?? []).map((a) => a.id);
 
   const clasesCerradas: string[] = [];
@@ -220,13 +225,17 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
     let nuevos = 0;
 
     for (const r of p.registros) {
-      const { error: eAsis } = await supabaseAdmin.from("asistencia").insert({
-        alumno: r.alumnoId,
-        curso: p.curso,
-        fecha: hoyStr,
-        hora: ahora,
-        estado: r.estado,
-      });
+      const { data: asisInsertada, error: eAsis } = await supabaseAdmin
+        .from("asistencia")
+        .insert({
+          alumno: r.alumnoId,
+          curso: p.curso,
+          fecha: hoyStr,
+          hora: ahora,
+          estado: r.estado,
+        })
+        .select("id")
+        .single();
       if (eAsis) {
         errores.push(`Asistencia ${p.curso}: ${eAsis.message}`);
         continue;
@@ -240,6 +249,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
           monto: montoTardanza,
           fecha: hoyStr,
           estado: "Pendiente",
+          asistencia_id: asisInsertada?.id ?? null,
         });
         if (eMulta) errores.push(`Multa ${p.curso}: ${eMulta.message}`);
         tardanzas++;
@@ -284,6 +294,25 @@ export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: 
 
   const hoy = fechaHoy();
   const ahora = horaAhora();
+  const hoyDia = diaHoy();
+  const ahoraMin = aMinutos(ahora);
+
+  // Busca la clase de hoy con ese curso para validar que aún no terminó
+  const { data: horario } = await supabaseAdmin
+    .from("horario")
+    .select("*")
+    .eq("dia", hoyDia)
+    .ilike("curso", curso);
+  const h = (horario ?? []).find((x) => normalizeName(x.curso) === normalizeName(curso));
+
+  if (h) {
+    const finMin = aMinutos(h.hora_fin);
+    if (ahoraMin >= finMin) {
+      return { ok: false, error: "La clase ya terminó hoy (" + h.hora_fin + "). No se puede abrir." };
+    }
+  } else {
+    return { ok: false, error: "No hay una clase de " + curso + " hoy" };
+  }
 
   const { data: existente } = await supabaseAdmin
     .from("clases_abiertas")
@@ -324,7 +353,6 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
   if (!t) return { ok: false, error: "Token vacío" };
 
   const { data: configRows } = await supabaseAdmin.from("configuracion").select("*").limit(1);
-  const tolerancia = Number(configRows?.[0]?.tiempo_cierre_qr) || 5;
   const montoTardanza = Number(configRows?.[0]?.multa_tardanza) || 1;
 
   const { data: cursos } = await supabaseAdmin
@@ -351,7 +379,8 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
   let encontrada: { horario: { id: number; curso: string }; estado: string } | null = null;
   for (const h of lista) {
     const aperturaManual = aperturaPorCurso.get(normalizeName(h.curso)) ?? null;
-    const est = estadoClase(h, tolerancia, aperturaManual);
+    const primera = esPrimeraClase(h, lista, hoy, excluidos);
+    const est = estadoClase(h, aperturaManual, primera);
     if (est !== "Activa" && est !== "Cerrada") continue;
     if (firmaValida(t, h.id, h.curso, hoyStr, qrSecret(), Date.now())) {
       encontrada = { horario: { id: h.id, curso: h.curso }, estado: est };
@@ -386,13 +415,17 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
 
   const estado = encontrada.estado === "Cerrada" ? "Tardanza" : "Presente";
 
-  const { error: errAsis } = await supabaseAdmin.from("asistencia").insert({
-    alumno: alumnoId,
-    curso: encontrada.horario.curso,
-    fecha: hoyStr,
-    hora: horaAhora(),
-    estado,
-  });
+  const { data: asisInsertada, error: errAsis } = await supabaseAdmin
+    .from("asistencia")
+    .insert({
+      alumno: alumnoId,
+      curso: encontrada.horario.curso,
+      fecha: hoyStr,
+      hora: horaAhora(),
+      estado,
+    })
+    .select("id")
+    .single();
   if (errAsis) return { ok: false, error: "No se pudo registrar: " + errAsis.message };
 
   if (estado === "Tardanza") {
@@ -403,6 +436,7 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
       monto: montoTardanza,
       fecha: hoyStr,
       estado: "Pendiente",
+      asistencia_id: asisInsertada?.id ?? null,
     });
     if (errMulta) return { ok: false, error: "Asistencia registrada pero no se pudo crear la multa: " + errMulta.message };
   }

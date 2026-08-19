@@ -46,6 +46,7 @@ export default async function HorarioPage() {
                     <tr className="text-left text-slate-500">
                       <th className="py-1 pr-2 font-medium">Hora</th>
                       <th className="py-1 font-medium">Curso</th>
+                      <th className="py-1 font-medium">Docente</th>
                       <th className="py-1 font-medium">Aula</th>
                     </tr>
                   </thead>
@@ -56,6 +57,7 @@ export default async function HorarioPage() {
                           {c.hora_inicio?.slice(0, 5)} - {c.hora_fin?.slice(0, 5)}
                         </td>
                         <td className="py-1.5 font-medium text-slate-800">{c.curso}</td>
+                        <td className="py-1.5 text-slate-500">{c.docente || "—"}</td>
                         <td className="py-1.5 text-slate-500">{c.aula || "—"}</td>
                       </tr>
                     ))}

@@ -20,15 +20,17 @@ export default async function EditarHorarioPage() {
     );
   }
 
-  const [{ data: horario }, { data: cursos }] = await Promise.all([
+  const [{ data: horario }, { data: cursos }, { data: docentes }] = await Promise.all([
     supabase.from("horario").select("*").order("hora_inicio"),
     supabase.from("cursos").select("id,nombre").order("id"),
+    supabase.from("docentes").select("nombre").eq("estado", "Activo").order("nombre"),
   ]);
 
   return (
     <HorarioEditor
       clases={horario ?? []}
       cursos={(cursos ?? []).map((c) => c.nombre)}
+      docentes={(docentes ?? []).map((d) => d.nombre)}
       dias={DIAS}
     />
   );

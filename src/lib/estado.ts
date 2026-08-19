@@ -39,6 +39,11 @@ export function normalizeName(nombre: string): string {
     .trim();
 }
 
+// Los alumnos y la tesorera tienen QR y se les registra asistencia.
+export function esAlumno(rol: string): boolean {
+  return rol === "Alumno" || rol === "Tesorera";
+}
+
 export function fechaHoy(): string {
   const p = peruParts();
   return `${p.y}-${p.m}-${p.d}`;
@@ -61,16 +66,33 @@ export function aMinutos(h: string | null): number {
 
 export type ClaseEstadoInput = {
   dia: string;
+  curso: string;
   hora_inicio: string;
   hora_fin: string;
   apertura_qr: string | null;
   cierre_lista: string | null;
 };
 
+// Determina si una clase es la primera del día (la de hora de inicio más temprana
+// entre las clases de ese día, excluyendo las de asistencia no obligatoria).
+export function esPrimeraClase(
+  h: ClaseEstadoInput,
+  todas: ClaseEstadoInput[],
+  dia: string,
+  excluidos: Set<string>
+): boolean {
+  const mismoDia = (todas ?? []).filter(
+    (c) => normalizeName(c.dia) === normalizeName(dia) && !excluidos.has(normalizeName(c.curso))
+  );
+  if (mismoDia.length === 0) return false;
+  const horaInicio = aMinutos(h.hora_inicio);
+  return mismoDia.every((c) => aMinutos(c.hora_inicio) >= horaInicio);
+}
+
 export function estadoClase(
   h: ClaseEstadoInput,
-  tolerancia: number,
-  aperturaManual: string | null = null
+  aperturaManual: string | null = null,
+  esPrimera: boolean = false
 ): string {
   const ahora = aMinutos(horaAhora());
   const hoy = fechaHoy();
@@ -80,10 +102,14 @@ export function estadoClase(
   const ini = aMinutos(h.hora_inicio);
   const fin = aMinutos(h.hora_fin);
 
-  // Se activa automaticamente 5 minutos antes de la hora de inicio
-  const apertura = aperturaManual ? aMinutos(aperturaManual) : aMinutos(h.apertura_qr) || ini - 5;
-  // Se cierra automaticamente 5 minutos despues de la hora de inicio
-  const cierre = (aperturaManual ? aMinutos(aperturaManual) : aMinutos(h.cierre_lista) || ini) + tolerancia;
+  // Primera clase del día: abre 5 min antes del inicio y cierra 5 min después.
+  // Cambios de curso: abre justo en el cambio y cierra 10 min después.
+  const apertura = aperturaManual
+    ? aMinutos(aperturaManual)
+    : aMinutos(h.apertura_qr) || (esPrimera ? ini - 5 : ini);
+  const cierre = aperturaManual
+    ? aMinutos(aperturaManual) + 10
+    : aMinutos(h.cierre_lista) || (esPrimera ? ini + 5 : ini + 10);
 
   if (ahora < apertura) return "Programada";
   if (ahora >= apertura && ahora < cierre) return "Activa";

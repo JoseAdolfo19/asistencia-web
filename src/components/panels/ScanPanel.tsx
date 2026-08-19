@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { marcarAsistencia, abrirClase, resolverAlumno, cerrarClasesPendientes } from "@/lib/marcar";
-import { diaHoy } from "@/lib/estado";
+import { diaHoy, aMinutos, horaAhora } from "@/lib/estado";
 import Button from "@/components/ui/Button";
 
 const CAMERA_ID = "qr-reader-region";
@@ -169,22 +169,34 @@ export default function ScanPanel({ docente, clasesHoy }: { docente: string; cla
           <p className="text-sm text-slate-500">No hay clases programadas para hoy.</p>
         ) : (
           <div className="space-y-2">
-            {clasesHoy.map((c) => (
-              <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
-                <div>
-                  <div className="font-medium text-slate-800">{c.curso}</div>
-                  <div className="text-xs text-slate-500">
-                    {c.hora_inicio?.slice(0, 5)} - {c.hora_fin?.slice(0, 5)}
+            {clasesHoy.map((c) => {
+              const ahoraMin = aMinutos(horaAhora());
+              const finalizada = aMinutos(c.hora_fin) <= ahoraMin;
+              return (
+                <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                  <div>
+                    <div className="font-medium text-slate-800">{c.curso}</div>
+                    <div className="text-xs text-slate-500">
+                      {c.hora_inicio?.slice(0, 5)} - {c.hora_fin?.slice(0, 5)}
+                    </div>
+                    {abiertaMsg[c.curso] && (
+                      <div className="mt-1 text-xs font-medium text-blue-700">{abiertaMsg[c.curso]}</div>
+                    )}
+                    {finalizada && (
+                      <div className="mt-1 text-xs font-medium text-slate-500">Clase cerrada este día.</div>
+                    )}
                   </div>
-                  {abiertaMsg[c.curso] && (
-                    <div className="mt-1 text-xs font-medium text-blue-700">{abiertaMsg[c.curso]}</div>
-                  )}
+                  <Button
+                    variant={finalizada ? "secondary" : "success"}
+                    onClick={() => onAbrirClase(c.curso)}
+                    disabled={finalizada}
+                    title={finalizada ? "La clase ya terminó hoy" : "Abrir clase para marcar Presente"}
+                  >
+                    {finalizada ? "Clase cerrada" : "Abrir clase"}
+                  </Button>
                 </div>
-                <Button variant="success" onClick={() => onAbrirClase(c.curso)}>
-                  Abrir clase
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <p className="mt-2 text-xs text-slate-400">
@@ -192,8 +204,10 @@ export default function ScanPanel({ docente, clasesHoy }: { docente: string; cla
           en Tardanza por tu retraso.
         </p>
         <p className="mt-2 text-xs text-slate-400">
-          Cada clase se cierra automáticamente 5 minutos después de su hora de inicio: quien no escaneó pero llegó
-          a otra clase del día queda en Tardanza (con multa); quien no llegó en todo el día queda en Falta.
+          Cada clase se cierra automáticamente: la primera del día abre 5 minutos antes y se cierra 5 minutos después
+          de su hora de inicio; en los cambios de curso abre justo en el inicio y se cierra 10 minutos después.
+          Quien no escaneó pero llegó a otra clase del día queda en Tardanza (con multa); quien no llegó en todo el
+          día queda en Falta.
         </p>
         {cierreMsg && (
           <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">{cierreMsg}</div>
