@@ -276,7 +276,7 @@ src/
     ├── marcar.ts               # marcarConQrDocente, marcarAsistencia, getDocenteQrToken, abrirClase, resolverAlumno, cerrarClasesPendientes (throttle 60s + cache TTL)
     ├── actividades.ts          # crearActividad / marcarParticipacion / cerrarActividad / reabrirActividad
     ├── admin.ts                # actualizarPerfil / resetearPassword (solo admin)
-    ├── multas.ts               # cambiarEstadoMulta (cobro), crearMultaBuzo (tesorera)
+    ├── multas.ts               # cambiarEstadoMulta (cobro), crearMultaBuzo (tesorera), justificarAsistencia (justificar Falta/Tardanza y anular multa)
     └── horario.ts              # guardarClase / eliminarClase (admin)
 ```
 
