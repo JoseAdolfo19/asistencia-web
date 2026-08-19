@@ -159,7 +159,7 @@ Gráficos con `recharts` (`src/components/panels/DashboardPanel.tsx`).
 - **Auditoría** (`src/lib/auditoria.ts`, tabla `auditoria`): registra login, bloqueos, cambio de contraseña, cobros, creación/edición de clases, aperturas y marcaciones (usuario, rol, acción, detalle, fecha).
 - **Sesiones expirables** (`alumnos.session_version`): el administrador puede `cerrarSesionTodosDispositivos()`; al incrementar la versión, todas las cookies del usuario quedan invalidadas. La firma de la cookie incluye la versión.
 - **Botón tesorera "multa por buzo"**: en el panel de Multas, la tesorera/admin selecciona un alumno y crea una multa tipo **Buzo** (monto `multa_buzo`) que el alumno ve en su panel.
-- **Justificación de faltas/tardanzas**: docente, tesorera o admin pueden marcar una Falta/Tardanza como **justificada** (con motivo) desde el panel de Asistencia. El registro muestra el badge "Justificada", la multa asociada se **anula** (estado `Anulada`) y no cuenta como pendiente ni en el resumen de multas.
+- **Justificación de faltas/tardanzas**: docente, tesorera o admin pueden marcar una Falta/Tardanza como **justificada** (con motivo) desde el panel de Asistencia. El registro pasa a estado **Presente** (mantiene el badge "Justificada"), la multa asociada se **anula** (estado `Anulada`) y no cuenta como pendiente ni en el resumen de multas.
 - **Conexiones con timeout**: los clientes de Supabase (`supabase.ts` y `supabaseAdmin.ts`) usan `AbortSignal.timeout(45 s)` para que ninguna petición se cuelgue.
 - **Contraseñas seguras**: todos los formularios de contraseña (cambio, recuperación, admin) exigen mínimo 10 caracteres con mayúscula, minúscula, número y símbolo, con un **verificador de fortaleza en vivo** (`src/components/ui/PasswordStrength.tsx` + reglas compartidas en `src/lib/password.ts`).
 
@@ -368,7 +368,7 @@ npm run dev        # http://localhost:3000
 24. **GitHub Actions**: `ci.yml` (typecheck + lint + tests + build) y `backup.yml` (respaldo diario de la BD como artefacto).
 25. **Horario definitivo 2026-II (Contabilidad II)**: 18 bloques 08:00–13:30 con receso 11:00–11:30; Lunes Cívico y Taller de fortalecimiento **con QR**; Ofimática con docente Uriel (`uriel@ieslasalle.edu.pe`); Jose AL010 cambiado a rol Docente para pruebas.
 26. **Botón tesorera "multa por buzo"**: `crearMultaBuzo` crea la multa tipo Buzo por alumno desde el panel de Multas.
-27. **Justificación de faltas/tardanzas**: docente/tesorera/admin marcan una Falta/Tardanza como justificada (columnas `justificada`/`motivo_justificacion`); la multa asociada se anula (estado `Anulada`).
+27. **Justificación de faltas/tardanzas**: docente/tesorera/admin marcan una Falta/Tardanza como justificada (columnas `justificada`/`motivo_justificacion`); el registro pasa a **Presente** y la multa asociada se anula (estado `Anulada`).
 28. **Conexión tardanza–multa**: `multas.asistencia_id` vincula la multa de tardanza con su registro; justificar anula solo esa multa.
 29. **Abrir clase bloqueado tras la hora fin**: el servidor rechaza abrir y el panel deshabilita el botón ("Clase cerrada").
 30. **Taller de fortalecimiento opcional**: mantiene QR como los demás cursos, pero `asistencia_obligatoria = false` — no genera Falta/Tardanza automática ni multas al cerrar clase.

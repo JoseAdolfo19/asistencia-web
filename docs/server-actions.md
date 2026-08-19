@@ -53,7 +53,7 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 |---|---|---|
 | `cambiarEstadoMulta(id, nuevoEstado)` | Tesorera/Admin | Actualiza el estado de una multa (p.ej. cobrar). |
 | `crearMultaBuzo(alumnoId)` | Tesorera/Admin | Crea una multa tipo **Buzo** por el monto de `configuracion.multa_buzo` para el alumno indicado. |
-| `justificarAsistencia(registroId, motivo)` | Docente/Tesorera/Admin | Justifica una Falta o Tardanza (columnas `justificada`/`motivo_justificacion`) y **anula** la multa pendiente vinculada vía `asistencia_id` (con fallback por alumno+fecha si la columna no existe). |
+| `justificarAsistencia(registroId, motivo)` | Docente/Tesorera/Admin | Justifica una Falta o Tardanza: la pasa a **Presente** (columnas `justificada`/`motivo_justificacion`) y **anula** la multa pendiente vinculada vía `asistencia_id` (con fallback por alumno+fecha si la columna no existe). |
 
 ## horario.ts
 

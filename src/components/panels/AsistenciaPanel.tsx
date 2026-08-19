@@ -130,7 +130,7 @@ export default function AsistenciaPanel({
     if (!res.ok) {
       setMsg({ ok: false, text: res.error || "Error al justificar." });
     } else {
-      setMsg({ ok: true, text: "Falta/Tardanza justificada. La multa asociada fue anulada." });
+      setMsg({ ok: true, text: "Falta/Tardanza justificada: queda como Presente y la multa fue anulada." });
       cargar(filtroCurso, filtroFecha, filtroAlumno);
     }
   }

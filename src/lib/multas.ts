@@ -91,10 +91,10 @@ export async function justificarAsistencia(
     return { ok: false, error: "Solo se puede justificar una Falta o Tardanza" };
   }
 
-  // Marca el registro como justificado
+  // Marca el registro como justificado y pasa a Presente
   const { error: errUpdate } = await supabaseAdmin
     .from("asistencia")
-    .update({ justificada: true, motivo_justificacion: texto })
+    .update({ justificada: true, motivo_justificacion: texto, estado: "Presente" })
     .eq("id", id);
   if (errUpdate) return { ok: false, error: "No se pudo justificar: " + errUpdate.message };
 
