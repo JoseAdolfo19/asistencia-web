@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/session";
 import { hashPassword, randomSalt } from "@/lib/crypto";
+import { validarNuevaContrasena } from "@/lib/password";
 import { registrarAuditoria } from "@/lib/auditoria";
 
 export type AdminGestionResult = { ok: boolean; error?: string };
@@ -76,7 +77,6 @@ export async function resetearPassword(
   const uid = String(id || "").trim();
   const pw = String(nueva || "").trim();
   if (!uid) return { ok: false, error: "Usuario inválido" };
-  if (pw.length < 8) return { ok: false, error: "La contraseña debe tener al menos 8 caracteres" };
 
   const { data: fila } = await supabaseAdmin
     .from("alumnos")
@@ -86,11 +86,8 @@ export async function resetearPassword(
   if (!fila || fila.length === 0) return { ok: false, error: "Usuario no encontrado" };
   const u = fila[0];
 
-  if (pw === String(u.dni || "")) return { ok: false, error: "No puedes usar el DNI como contraseña" };
-  const nombreMayus = String(u.nombres || "").toUpperCase().split(" ")[0];
-  if (nombreMayus && pw.toUpperCase() === nombreMayus) {
-    return { ok: false, error: "No puedes usar el nombre como contraseña" };
-  }
+  const errValidacion = validarNuevaContrasena(pw, u.dni, u.nombres);
+  if (errValidacion) return { ok: false, error: errValidacion };
 
   const salt = randomSalt();
   const hash = hashPassword(pw, salt);
