@@ -88,7 +88,7 @@ Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`sr
 - El QR del docente codifica solo `token` (firmado por servidor): `SHA-256([horario.id, curso, fecha, seed].join("|") + "|" + QR_SECRET)`. El secreto `QR_SECRET` vive solo en el servidor (`.env.local` / Vercel) y nunca viaja al bundle del cliente.
 - El token rota cada 30 segundos (`seed` = época/30s, se aceptan deltas `0` y `-1`).
 - Es válido solo dentro de la ventana de la clase (estado `Activa` o `Cerrada`); al pasar `hora_fin` queda `Finalizada` y el escaneo se rechaza.
-- Solo hay QR en cursos con `asistencia_obligatoria = true`. El **Taller de fortalecimiento** tiene `asistencia_obligatoria = false`: no genera QR, no se escanea y no produce faltas/tardanzas.
+- Todos los cursos tienen QR, incluido el **Taller de fortalecimiento**: todos tienen `asistencia_obligatoria = true`, así que el QR se escanea y el cierre automático genera Falta/Tardanza y multas por igual. La bandera `asistencia_obligatoria` solo excluye del QR/cierre a cursos marcados en `false` (hoy ninguno).
 
 ---
 
@@ -366,7 +366,7 @@ npm run dev        # http://localhost:3000
 27. **Justificación de faltas/tardanzas**: docente/tesorera/admin marcan una Falta/Tardanza como justificada (columnas `justificada`/`motivo_justificacion`); la multa asociada se anula (estado `Anulada`).
 28. **Conexión tardanza–multa**: `multas.asistencia_id` vincula la multa de tardanza con su registro; justificar anula solo esa multa.
 29. **Abrir clase bloqueado tras la hora fin**: el servidor rechaza abrir y el panel deshabilita el botón ("Clase cerrada").
-30. **Taller de fortalecimiento opcional**: `asistencia_obligatoria = false` (sin QR, sin cierre).
+30. **Taller de fortalecimiento con QR**: se mantiene con `asistencia_obligatoria = true`, igual que el resto — genera QR, se escanea y el cierre automático aplica Falta/Tardanza y multas.
 31. **Cuenta administrador AL033** (`admin@ieslasalle.edu.pe`) con rol Administrador.
 32. **Control de Actividades**: tablas `actividades`/`actividad_alumnos`, multas de S/50 por no participación, cerrar/reabrir, panel y página `/actividades`.
 33. **Restricción AL001–AL032**: `esAlumnoRegistrado` limita la marcación y la participación solo a los 32 alumnos; docentes/admin quedan fuera.
