@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { marcarConQrDocente, marcarConCodigo } from "@/lib/marcar";
-import { marcarClaseLocal, type ClaseLocalInfo } from "@/lib/claseLocal";
+import { marcarClaseLocal, getClaseLocalPara, type ClaseLocalInfo } from "@/lib/claseLocal";
 import Button from "@/components/ui/Button";
 
 const CAMERA_ID = "qr-reader-alumno";
@@ -15,8 +15,25 @@ export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; cl
   const [nombreConfirm, setNombreConfirm] = useState(nombre);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [claseLocalData, setClaseLocalData] = useState<ClaseLocalInfo | null>(claseLocal);
   const processingRef = useRef(false);
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Refresca la clase local (registros de Daniela) cada 15 s para que la vista
+  // de Jose se actualice sin recargar la página.
+  useEffect(() => {
+    let activo = true;
+    async function refrescar() {
+      const res = await getClaseLocalPara();
+      if (activo && res.ok) setClaseLocalData(res.data);
+    }
+    refrescar();
+    const id = setInterval(refrescar, 15_000);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, []);
 
   async function marcar(raw: string) {
     if (processingRef.current) return;
@@ -79,17 +96,19 @@ export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; cl
   }
 
   async function marcarClase() {
-    if (!claseLocal || processingRef.current) return;
+    if (!claseLocalData || processingRef.current) return;
     processingRef.current = true;
     setLoading(true);
     setResult(null);
     let ok = false;
     let msg = "";
     try {
-      const res = await marcarClaseLocal(claseLocal.id);
+      const res = await marcarClaseLocal(claseLocalData.id);
       if (res.ok) {
         ok = true;
         msg = `Asistencia registrada en la clase local: ${res.estado}`;
+        const ref = await getClaseLocalPara();
+        if (ref.ok) setClaseLocalData(ref.data);
       } else {
         ok = false;
         msg = res.error;
@@ -202,33 +221,47 @@ export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; cl
             </p>
           </div>
         </div>
-        {claseLocal && (
+        {claseLocalData && (
           <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 shadow-sm">
-            <h2 className="mb-2 font-semibold text-purple-800">{claseLocal.nombre}</h2>
-            {claseLocal.puedoMarcar ? (
+            <h2 className="mb-2 font-semibold text-purple-800">{claseLocalData.nombre}</h2>
+            {claseLocalData.puedoMarcar ? (
               <>
                 <p className="text-sm text-purple-700">
                   Clase de prueba: registra tu asistencia aquí (es voluntaria y no genera multas).
                 </p>
                 <div className="mt-3 flex items-center gap-3">
-                  <Button onClick={marcarClase} disabled={loading || claseLocal.marcadaHoy} size="lg">
-                    {claseLocal.marcadaHoy ? "Ya marcaste hoy" : "Marcar en clase local"}
+                  <Button onClick={marcarClase} disabled={loading || claseLocalData.marcadaHoy} size="lg">
+                    {claseLocalData.marcadaHoy ? "Ya marcaste hoy" : "Marcar en clase local"}
                   </Button>
-                  {claseLocal.marcadaHoy && (
+                  {claseLocalData.marcadaHoy && (
                     <span className="text-sm font-semibold text-green-700">✔ Asistencia registrada hoy</span>
                   )}
                 </div>
               </>
             ) : (
-              <p className="text-sm text-purple-700">
-                Clase local de Daniela HUANCA MIRANDA. Puedes ver los registros, pero no marcar.
-              </p>
+              <>
+                <p className="text-sm text-purple-700">
+                  Clase local de Daniela HUANCA MIRANDA. Puedes ver los registros, pero no marcar.
+                </p>
+                {claseLocalData.marcadaHoy && (
+                  <p className="mt-2 text-sm font-semibold text-green-700">
+                    ✔ Daniela marcó hoy a las{" "}
+                    {(() => {
+                      const d = new Date();
+                      const hoyStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+                        d.getDate()
+                      ).padStart(2, "0")}`;
+                      return claseLocalData.registros.find((r) => r.fecha === hoyStr)?.hora ?? "";
+                    })()}
+                  </p>
+                )}
+              </>
             )}
-            {claseLocal.registros.length > 0 && (
+            {claseLocalData.registros.length > 0 && (
               <div className="mt-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-purple-500">Últimos registros</p>
                 <ul className="mt-1 space-y-1 text-sm text-purple-800">
-                  {claseLocal.registros.map((r, i) => (
+                  {claseLocalData.registros.map((r, i) => (
                     <li key={i} className="flex justify-between gap-2">
                       <span>{r.fecha}</span>
                       <span className="text-purple-500">{r.hora}</span>
