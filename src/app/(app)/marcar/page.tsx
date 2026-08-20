@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { esAlumno } from "@/lib/estado";
+import { getClaseLocalPara } from "@/lib/claseLocal";
 import MarcarPanel from "@/components/panels/MarcarPanel";
 
 export const dynamic = "force-dynamic";
@@ -21,5 +22,7 @@ export default async function MarcarPage() {
     );
   }
 
-  return <MarcarPanel nombre={session.nombres + " " + session.apellidos} />;
+  const claseLocal = await getClaseLocalPara();
+
+  return <MarcarPanel nombre={session.nombres + " " + session.apellidos} claseLocal={claseLocal.ok ? claseLocal.data : null} />;
 }

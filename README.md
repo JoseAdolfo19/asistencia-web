@@ -82,9 +82,9 @@ Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`sr
 ### Marcación invertida (el alumno escanea el QR del docente)
 - El docente entra a **QR** (`/qr`) y ve el QR de la clase activa: **solo el token** (sin alumno), rotando cada 30 s, con botón "Abrir clase".
 - El alumno entra a **Marcar** (`/marcar`), apunta su cámara al QR del docente y se marca él mismo. Su identidad sale de su **sesión** (`marcarConQrDocente` en `src/lib/marcar.ts`); el token solo identifica la clase activa.
-- También hay entrada manual pegando el token. Si el QR escaneado fuera de alumno (`token|alumno`) se toma solo el token.
 - **Código de clase:** segunda vía sin cámara. El docente muestra un código numérico de 6 dígitos (junto al QR) que rota cada 30 s; el alumno escribe el código + su nombre en `/marcar` y se registra igual (`marcarConCodigo` en `src/lib/marcar.ts`, valida que el nombre coincida con su cuenta). Útil en el Taller o cuando la cámara no funciona.
-- El docente conserva `/escanear` (cámara + entrada manual) como respaldo/emergencia.
+- **Clase local (prueba):** clase aislada que no aparece en el horario ni en el cierre automático. Daniela (AL009) marca desde `/marcar` y Jose Adolfo (AL010) la ve sin marcar. Tablas `clases_locales`/`clase_local_registros` y acciones en `src/lib/claseLocal.ts`.
+- El docente conserva `/escanear` (cámara + entrada manual del token) como respaldo/emergencia.
 
 ### QR
 - El QR del docente codifica solo `token` (firmado por servidor): `SHA-256([horario.id, curso, fecha, seed].join("|") + "|" + QR_SECRET)`. El secreto `QR_SECRET` vive solo en el servidor (`.env.local` / Vercel) y nunca viaja al bundle del cliente.
@@ -383,3 +383,4 @@ npm run dev        # http://localhost:3000
 38. **Contraseñas seguras**: mínimo 10 caracteres con mayúscula, minúscula, número y símbolo, con verificador de fortaleza en vivo en todos los formularios.
 39. **Justificación de faltas/tardanzas**: el registro pasa a **Presente** y la multa asociada se anula.
 40. **Código de clase**: el docente muestra un código de 6 dígitos junto al QR (rota cada 30 s); el alumno puede marcar escribiendo el código + su nombre desde `/marcar`. En el Taller la asistencia es opcional y no penaliza.
+41. **Clase local (prueba)**: clase aislada (`clases_locales`/`clase_local_registros`) visible solo para Daniela (AL009) y Jose Adolfo (AL010). Daniela marca desde `/marcar` (voluntaria, una vez por día); Jose la ve sin marcar. No genera faltas ni multas.

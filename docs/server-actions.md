@@ -32,6 +32,13 @@ Ninguna escritura se hace desde el cliente: todo pasa por `supabaseAdmin`
 | `abrirClase(curso)` | Docente/Admin | Abre manualmente una clase hoy (rechazada si la clase ya terminó). |
 | `cerrarClasesPendientes()` | Autenticado | Cierra clases cuyo horario terminó: marca Falta/Tardanza y crea las multas. Throttle de 1/min + inserts en lote. |
 
+## claseLocal.ts
+
+| Acción | Rol | Qué hace |
+|---|---|---|
+| `getClaseLocalPara()` | Alumno/Tesorera | Devuelve la clase local activa si el alumno está en `visible_para` (Daniela AL009 la marca; Jose Adolfo AL010 la ve). Incluye `puedoMarcar`, `marcadaHoy` y los últimos registros. Si las tablas no existen o no aplica, devuelve `data: null`. |
+| `marcarClaseLocal(id)` | Alumno/Tesorera | Registra Presente del alumno en la clase local (solo el `alumno_marca`, una vez por día). Voluntario: nunca genera faltas ni multas. Rate limit: 6/min. |
+
 ## actividades.ts
 
 | Acción | Rol | Qué hace |

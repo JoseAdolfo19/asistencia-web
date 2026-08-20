@@ -221,6 +221,63 @@ export type Database = {
         }
         Relationships: []
       }
+      clase_local_registros: {
+        Row: {
+          alumno: string
+          clase_local_id: number
+          creado_en: string
+          estado: string
+          fecha: string
+          hora: string
+          id: number
+        }
+        Insert: {
+          alumno: string
+          clase_local_id: number
+          creado_en?: string
+          estado?: string
+          fecha: string
+          hora: string
+          id?: number
+        }
+        Update: {
+          alumno?: string
+          clase_local_id?: number
+          creado_en?: string
+          estado?: string
+          fecha?: string
+          hora?: string
+          id?: number
+        }
+        Relationships: []
+      }
+      clases_locales: {
+        Row: {
+          activa: boolean
+          alumno_marca: string
+          creado_en: string
+          id: number
+          nombre: string
+          visible_para: string[]
+        }
+        Insert: {
+          activa?: boolean
+          alumno_marca: string
+          creado_en?: string
+          id?: number
+          nombre: string
+          visible_para?: string[]
+        }
+        Update: {
+          activa?: boolean
+          alumno_marca?: string
+          creado_en?: string
+          id?: number
+          nombre?: string
+          visible_para?: string[]
+        }
+        Relationships: []
+      }
       configuracion: {
         Row: {
           id: number

@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { marcarConQrDocente, marcarConCodigo } from "@/lib/marcar";
+import { marcarClaseLocal, type ClaseLocalInfo } from "@/lib/claseLocal";
 import Button from "@/components/ui/Button";
 
 const CAMERA_ID = "qr-reader-alumno";
 
-export default function MarcarPanel({ nombre }: { nombre: string }) {
+export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; claseLocal: ClaseLocalInfo | null }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
-  const [tokenManual, setTokenManual] = useState("");
   const [codigoClase, setCodigoClase] = useState("");
   const [nombreConfirm, setNombreConfirm] = useState(nombre);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -71,6 +71,32 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
     } catch {
       ok = false;
       msg = "Error al registrar la asistencia. Intenta de nuevo.";
+    } finally {
+      processingRef.current = false;
+      setLoading(false);
+      setResult({ ok, msg });
+    }
+  }
+
+  async function marcarClase() {
+    if (!claseLocal || processingRef.current) return;
+    processingRef.current = true;
+    setLoading(true);
+    setResult(null);
+    let ok = false;
+    let msg = "";
+    try {
+      const res = await marcarClaseLocal(claseLocal.id);
+      if (res.ok) {
+        ok = true;
+        msg = `Asistencia registrada en la clase local: ${res.estado}`;
+      } else {
+        ok = false;
+        msg = res.error;
+      }
+    } catch {
+      ok = false;
+      msg = "Error al registrar. Intenta de nuevo.";
     } finally {
       processingRef.current = false;
       setLoading(false);
@@ -140,24 +166,6 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
         </div>
 
         <div className="rounded-xl bg-white p-4 shadow">
-          <h2 className="mb-2 font-semibold text-slate-700">Entrada manual</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600">Token del QR del docente</label>
-              <textarea
-                value={tokenManual}
-                onChange={(e) => setTokenManual(e.target.value)}
-                rows={2}
-                placeholder="pega aquí el token del QR"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <Button onClick={() => marcar(tokenManual)} disabled={!tokenManual.trim() || loading} size="lg">
-              Marcar asistencia
-            </Button>
-          </div>
-        </div>
-      <div className="rounded-xl bg-white p-4 shadow">
           <h2 className="mb-2 font-semibold text-slate-700">Código de clase</h2>
           <div className="space-y-3">
             <div>
@@ -194,6 +202,44 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
             </p>
           </div>
         </div>
+        {claseLocal && (
+          <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 shadow-sm">
+            <h2 className="mb-2 font-semibold text-purple-800">{claseLocal.nombre}</h2>
+            {claseLocal.puedoMarcar ? (
+              <>
+                <p className="text-sm text-purple-700">
+                  Clase de prueba: registra tu asistencia aquí (es voluntaria y no genera multas).
+                </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <Button onClick={marcarClase} disabled={loading || claseLocal.marcadaHoy} size="lg">
+                    {claseLocal.marcadaHoy ? "Ya marcaste hoy" : "Marcar en clase local"}
+                  </Button>
+                  {claseLocal.marcadaHoy && (
+                    <span className="text-sm font-semibold text-green-700">✔ Asistencia registrada hoy</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-purple-700">
+                Clase local de Daniela HUANCA MIRANDA. Puedes ver los registros, pero no marcar.
+              </p>
+            )}
+            {claseLocal.registros.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-purple-500">Últimos registros</p>
+                <ul className="mt-1 space-y-1 text-sm text-purple-800">
+                  {claseLocal.registros.map((r, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span>{r.fecha}</span>
+                      <span className="text-purple-500">{r.hora}</span>
+                      <span className="font-medium">{r.estado}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {loading && <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">Procesando...</p>}
