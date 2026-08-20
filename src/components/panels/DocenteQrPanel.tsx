@@ -19,6 +19,7 @@ const QR_REFRESH_SECONDS = 30;
 export default function DocenteQrPanel({ docente, clases }: { docente: string; clases: Clase[] }) {
   const [seleccionId, setSeleccionId] = useState<number | null>(null);
   const [qrValue, setQrValue] = useState("");
+  const [codigo, setCodigo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [abiertaMsg, setAbiertaMsg] = useState<string | null>(null);
 
@@ -31,14 +32,18 @@ export default function DocenteQrPanel({ docente, clases }: { docente: string; c
   const cargarToken = useCallback(async () => {
     if (!seleccion) {
       setQrValue("");
+      setCodigo("");
       setError(null);
       return;
     }
     setError(null);
     const res = await getDocenteQrToken(seleccion.id, seleccion.curso, fecha, seed);
-    if (res.ok) setQrValue(res.token);
-    else {
+    if (res.ok) {
+      setQrValue(res.token);
+      setCodigo(res.codigo);
+    } else {
       setQrValue("");
+      setCodigo("");
       setError(res.error);
     }
   }, [seleccion, fecha, seed]);
@@ -59,7 +64,8 @@ export default function DocenteQrPanel({ docente, clases }: { docente: string; c
     <div>
       <h1 className="text-xl font-bold text-blue-900">QR de la Clase</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Docente: {docente}. Los alumnos escanean este QR desde &quot;Marcar&quot; en su celular.
+        Docente: {docente}. Los alumnos escanean este QR desde &quot;Marcar&quot; en su celular, o escriben el
+        código de clase + su nombre.
       </p>
 
       {clases.length === 0 && (
@@ -91,8 +97,9 @@ export default function DocenteQrPanel({ docente, clases }: { docente: string; c
               ))}
             </ul>
             <p className="mt-2 text-xs text-slate-400">
-              El QR se habilita unos minutos antes de cada clase y se actualiza cada {QR_REFRESH_SECONDS} segundos.
-              Si llegas tarde, toca &quot;Abrir clase&quot; al llegar para que los presentes marquen Presente.
+              El QR y el código se habilitan unos minutos antes de cada clase y se actualizan cada{" "}
+              {QR_REFRESH_SECONDS} segundos. Si llegas tarde, toca &quot;Abrir clase&quot; al llegar para que los
+              presentes marquen Presente. En el Taller la asistencia es opcional: no genera multas.
             </p>
           </div>
 
@@ -130,9 +137,18 @@ export default function DocenteQrPanel({ docente, clases }: { docente: string; c
                     <p className="text-xs text-slate-400">
                       Se actualiza cada {QR_REFRESH_SECONDS} segundos
                     </p>
+                    <div className="mt-1 w-full rounded-xl border border-blue-200 bg-blue-50 p-3 text-center">
+                      <p className="text-xs font-medium uppercase tracking-wide text-blue-600">
+                        Código de clase (si no pueden escanear)
+                      </p>
+                      <p className="font-mono text-3xl font-bold tracking-[0.3em] text-blue-900">{codigo}</p>
+                      <p className="mt-1 text-xs text-blue-500">
+                        El alumno escribe este código + su nombre en &quot;Marcar&quot;
+                      </p>
+                    </div>
                     {seleccion.estado === "Cerrada" && (
                       <p className="text-xs font-medium text-amber-700">
-                        Clase cerrada: quienes escaneen ahora quedarán en Tardanza.
+                        Clase cerrada: quienes marquen ahora quedarán en Tardanza.
                       </p>
                     )}
                   </div>

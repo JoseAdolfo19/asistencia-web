@@ -24,8 +24,10 @@ export default async function QrPage() {
   for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
 
   const hoy = diaHoy();
+  // Se incluyen también los cursos opcionales (p. ej. Taller): tienen QR y código,
+  // pero el cierre automático no penaliza por no marcar.
   const clasesHoy = (horario ?? [])
-    .filter((h) => h.dia === hoy && !excluidos.has(normalizeName(h.curso)))
+    .filter((h) => h.dia === hoy)
     .map((h) => ({
       ...h,
       estado: estadoClase(

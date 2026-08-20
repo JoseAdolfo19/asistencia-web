@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { marcarConQrDocente } from "@/lib/marcar";
+import { marcarConQrDocente, marcarConCodigo } from "@/lib/marcar";
 import Button from "@/components/ui/Button";
 
 const CAMERA_ID = "qr-reader-alumno";
@@ -11,6 +11,8 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
   const [tokenManual, setTokenManual] = useState("");
+  const [codigoClase, setCodigoClase] = useState("");
+  const [nombreConfirm, setNombreConfirm] = useState(nombre);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const processingRef = useRef(false);
@@ -47,6 +49,32 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
       if (scannerRef.current && scannerOn) {
         setTimeout(() => scannerRef.current?.resume(), ok ? 4000 : 1500);
       }
+    }
+  }
+
+  async function marcarCodigo() {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setLoading(true);
+    setResult(null);
+    let ok = false;
+    let msg = "";
+    try {
+      const res = await marcarConCodigo(codigoClase, nombreConfirm);
+      if (res.ok) {
+        ok = true;
+        msg = `Asistencia registrada: ${res.estado} en ${res.curso}`;
+      } else {
+        ok = false;
+        msg = res.error;
+      }
+    } catch {
+      ok = false;
+      msg = "Error al registrar la asistencia. Intenta de nuevo.";
+    } finally {
+      processingRef.current = false;
+      setLoading(false);
+      setResult({ ok, msg });
     }
   }
 
@@ -127,6 +155,43 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
             <Button onClick={() => marcar(tokenManual)} disabled={!tokenManual.trim() || loading} size="lg">
               Marcar asistencia
             </Button>
+          </div>
+        </div>
+      <div className="rounded-xl bg-white p-4 shadow">
+          <h2 className="mb-2 font-semibold text-slate-700">Código de clase</h2>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Código del docente (6 dígitos)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={codigoClase}
+                onChange={(e) => setCodigoClase(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-center font-mono text-xl tracking-[0.3em] focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Tu nombre (tal como está registrado)</label>
+              <input
+                type="text"
+                value={nombreConfirm}
+                onChange={(e) => setNombreConfirm(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            <Button
+              onClick={marcarCodigo}
+              disabled={codigoClase.trim().length !== 6 || !nombreConfirm.trim() || loading}
+              size="lg"
+            >
+              Marcar con código
+            </Button>
+            <p className="text-xs text-slate-400">
+              El docente muestra un código de 6 dígitos que cambia cada 30 segundos. Sirve cuando no puedes
+              escanear el QR.
+            </p>
           </div>
         </div>
       </div>

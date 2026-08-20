@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 import { estadoClase, esPrimeraClase, esAlumno, esAlumnoRegistrado, fechaHoy, diaHoy, horaAhora, normalizeName, aMinutos } from "@/lib/estado";
 import { permitirRateLimit } from "@/lib/rateLimit";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { qrSecret, firmaValida, generarFirmaQR } from "@/lib/qr";
+import { qrSecret, firmaValida, generarFirmaQR, generarCodigoClase, codigoValido } from "@/lib/qr";
 import { planificarCierre, planificarSubirFaltas, ClaseCierre, FaltaPendiente } from "@/lib/cierre";
 
 export type MarcarResult = { ok: true; estado: string; curso: string } | { ok: false; error: string };
@@ -94,7 +94,7 @@ export async function resolverAlumno(nombre: string): Promise<
   return { ok: true, id: a.id, nombreCompleto: `${a.nombres} ${a.apellidos}` };
 }
 
-export type QrTokenResult = { ok: true; token: string } | { ok: false; error: string };
+export type QrTokenResult = { ok: true; token: string; codigo: string } | { ok: false; error: string };
 
 // Valida que la clase sea de hoy, no excluida y esté en ventana (activa o cerrada)
 // y firma el token compartido de esa clase.
@@ -133,7 +133,8 @@ async function tokenDeClaseActiva(
   }
 
   const token = generarFirmaQR(h.id, h.curso, fechaHoy(), seed, qrSecret());
-  return { ok: true, token };
+  const codigo = generarCodigoClase(h.id, h.curso, fechaHoy(), seed, qrSecret());
+  return { ok: true, token, codigo };
 }
 
 // El docente muestra el QR de la clase activa para que los alumnos lo escaneen.
@@ -388,12 +389,13 @@ export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-// Procesa un token de clase para un alumno: valida la firma, registra Presente/Tardanza,
-// crea la multa si aplica y sube Faltas previas del día a Tardanza.
+// Procesa un token o código de clase para un alumno: valida la firma/código,
+// registra Presente/Tardanza, crea la multa si aplica y sube Faltas previas del día a Tardanza.
 async function marcarPorToken(
   token: string,
   alumnoId: string,
-  actorNombre: string
+  actorNombre: string,
+  viaCodigo = false
 ): Promise<MarcarResult> {
   // Procesa cierres automáticos de clases y faltas/tardanzas pendientes antes de marcar
   await cerrarClasesPendientes();
@@ -420,12 +422,22 @@ async function marcarPorToken(
     const primera = esPrimeraClase(h, lista, hoy, new Set());
     const est = estadoClase(h, aperturaManual, primera);
     if (est !== "Activa" && est !== "Cerrada") continue;
-    if (firmaValida(t, h.id, h.curso, hoyStr, qrSecret(), Date.now())) {
+    const valido = viaCodigo
+      ? codigoValido(t, h.id, h.curso, hoyStr, qrSecret(), Date.now())
+      : firmaValida(t, h.id, h.curso, hoyStr, qrSecret(), Date.now());
+    if (valido) {
       encontrada = { horario: { id: h.id, curso: h.curso }, estado: est };
       break;
     }
   }
-  if (!encontrada) return { ok: false, error: "QR inválido o expirado. Pide un QR nuevo." };
+  if (!encontrada) {
+    return {
+      ok: false,
+      error: viaCodigo
+        ? "Código inválido o expirado. Pide un código nuevo."
+        : "QR inválido o expirado. Pide un QR nuevo.",
+    };
+  }
 
   const { data: existentes } = await supabaseAdmin
     .from("asistencia")
@@ -519,4 +531,29 @@ export async function marcarConQrDocente(token: string): Promise<MarcarResult> {
   }
 
   return marcarPorToken(token, session.id, session.nombres + " " + session.apellidos);
+}
+
+// Segunda vía de marcación: el alumno escribe el código de clase que dicta el docente
+// (6 dígitos, rota cada 30s) y confirma su nombre para registrar su asistencia.
+export async function marcarConCodigo(codigo: string, nombre: string): Promise<MarcarResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden marcar con el código de clase" };
+  if (!esAlumnoRegistrado(session.id)) return { ok: false, error: "Cuenta no habilitada para marcar asistencia" };
+
+  const c = String(codigo || "").trim();
+  if (!/^\d{6}$/.test(c)) return { ok: false, error: "El código debe tener 6 dígitos" };
+
+  // El nombre confirma la identidad y debe coincidir con la cuenta
+  const nombreCompleto = session.nombres + " " + session.apellidos;
+  if (normalizeName(String(nombre || "")) !== normalizeName(nombreCompleto)) {
+    return { ok: false, error: "El nombre no coincide con tu cuenta" };
+  }
+
+  // Máximo 6 marcaciones por minuto por alumno
+  if (!(await permitirRateLimit(`marcar:${session.id}`, 6, 60_000))) {
+    return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
+  }
+
+  return marcarPorToken(c, session.id, nombreCompleto, true);
 }

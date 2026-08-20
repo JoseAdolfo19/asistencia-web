@@ -44,3 +44,35 @@ export function firmaValida(
 export function seedPara(ms: number): number {
   return seedActual(ms);
 }
+
+// Código numérico de 6 dígitos de la clase, derivado de la misma firma que el QR.
+// Permite marcar asistencia escribiendo el código en vez de escanear.
+export function generarCodigoClase(
+  claseId: number | string,
+  curso: string,
+  fecha: string,
+  seed: number,
+  secret: string
+): string {
+  const h = sha256Hex([claseId, curso, fecha, seed].join("|") + "|codigo|" + secret);
+  const num = parseInt(h.slice(0, 8), 16);
+  return String(num % 1000000).padStart(6, "0");
+}
+
+// Valida el código contra la semilla actual y la anterior (deltas 0 y -1).
+export function codigoValido(
+  codigo: string,
+  claseId: number | string,
+  curso: string,
+  fecha: string,
+  secret: string,
+  ms: number
+): boolean {
+  const c = String(codigo || "").trim();
+  if (!/^\d{6}$/.test(c)) return false;
+  for (const delta of [0, -1]) {
+    const seed = seedActual(ms) + delta;
+    if (generarCodigoClase(claseId, curso, fecha, seed, secret) === c) return true;
+  }
+  return false;
+}

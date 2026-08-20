@@ -14,8 +14,8 @@ Sistema web de asistencia por QR y control de multas para el Instituto de Educac
 |---|---|
 | Login | Propio contra la tabla `alumnos` (hash SHA-256 de `password \| salt`), cookie httpOnly, cambio de contraseña forzado en el primer login |
 | Horario | 31 bloques semanales, editable por el administrador |
-| QR de clase | El docente muestra un QR por clase (token firmado por servidor, rota cada 30 s); los alumnos lo escanean |
-| Marcación | El alumno escanea el QR del docente desde **Marcar** (`/marcar`); el docente conserva `/escanear` como respaldo |
+| QR de clase | El docente muestra un QR + **código de 6 dígitos** por clase (firmados por servidor, rotan cada 30 s); los alumnos escanean o escriben el código |
+| Marcación | El alumno escanea el QR del docente o escribe el código de clase + su nombre desde **Marcar** (`/marcar`); el docente conserva `/escanear` como respaldo |
 | Apertura manual | El docente abre la clase si llega tarde (`clases_abiertas`); los presentes marcan Presente |
 | Cierre automático | Abre 5 min antes del inicio / cierra según bloque; tardanzas y faltas automáticas |
 | Multas | Tardanza / Buzo / Actividad (S/50), cobradas por la tesorera |
@@ -44,8 +44,8 @@ Sistema web de asistencia por QR y control de multas para el Instituto de Educac
 | Función | Alumno | Docente | Tesorera | Admin |
 |---|---|---|---|---|
 | Ver horario | ✔ | ✔ | ✔ | ✔ |
-| Marcar asistencia escaneando el QR del docente (`/marcar`) | ✔ | ✖ | ✔ | ✖ |
-| Mostrar QR de la clase (para que los alumnos lo escaneen) | ✖ | ✔ | ✖ | ✔ |
+| Marcar asistencia con el QR del docente o el **código de clase** (`/marcar`) | ✔ | ✖ | ✔ | ✖ |
+| Mostrar QR y código de la clase (para que los alumnos marquen) | ✖ | ✔ | ✖ | ✔ |
 | Escanear a otros / entrada manual (respaldo `/escanear`) | ✖ | ✔ | ✖ | ✔ |
 | Abrir clase manualmente | ✖ | ✔ | ✖ | ✔ |
 | Ver asistencia de todos | ✖ | ✔ | ✔ | ✔ |
@@ -68,8 +68,8 @@ Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`sr
 - **Cierre:** 5 minutos después de la hora de inicio (`hora_inicio + tolerancia`, tolerancia = `configuracion.tiempo_cierre_qr = 5`).
 - **Estados por clase:**
   - `Programada` → antes de la apertura.
-  - `Activa` → dentro del bloque de marcación (apertura hasta cierre). El alumno puede escanear el QR del docente y marcar **Presente**.
-  - `Cerrada` → después del cierre. Si se escanea aún registra **Tardanza**.
+  - `Activa` → dentro del bloque de marcación (apertura hasta cierre). El alumno puede escanear el QR del docente o escribir el código de clase y marcar **Presente**.
+  - `Cerrada` → después del cierre. Si se marca aún registra **Tardanza**.
   - `Finalizada` → terminó el bloque (no se muestra en la lista del QR).
 - **Cierre automático:** cuando una clase pasa su `hora_fin`, `cerrarClasesPendientes()` (en `src/lib/marcar.ts`) procesa a los que no escanearon, diferenciando por día:
   - **Tardanza + multa (S/1)** si el alumno tiene algún registro de asistencia ese día (llegó, aunque sea a otra clase).
@@ -83,6 +83,7 @@ Todas las funciones de fecha/hora usan la zona horaria de **América/Lima** (`sr
 - El docente entra a **QR** (`/qr`) y ve el QR de la clase activa: **solo el token** (sin alumno), rotando cada 30 s, con botón "Abrir clase".
 - El alumno entra a **Marcar** (`/marcar`), apunta su cámara al QR del docente y se marca él mismo. Su identidad sale de su **sesión** (`marcarConQrDocente` en `src/lib/marcar.ts`); el token solo identifica la clase activa.
 - También hay entrada manual pegando el token. Si el QR escaneado fuera de alumno (`token|alumno`) se toma solo el token.
+- **Código de clase:** segunda vía sin cámara. El docente muestra un código numérico de 6 dígitos (junto al QR) que rota cada 30 s; el alumno escribe el código + su nombre en `/marcar` y se registra igual (`marcarConCodigo` en `src/lib/marcar.ts`, valida que el nombre coincida con su cuenta). Útil en el Taller o cuando la cámara no funciona.
 - El docente conserva `/escanear` (cámara + entrada manual) como respaldo/emergencia.
 
 ### QR
@@ -242,7 +243,7 @@ src/
 │       ├── actividades/        # Ruta del control de actividades
 │       ├── usuarios/           # Ruta de gestión de usuarios (admin)
 │       ├── qr/                 # Ruta del QR de la clase (docente/admin)
-│       ├── marcar/             # Ruta donde el alumno escanea el QR del docente
+│       ├── marcar/             # Ruta donde el alumno escanea el QR o escribe el código de clase
 │       └── escanear/           # Ruta de escaneo (docente/admin, respaldo)
 ├── components/
 │   ├── Nav.tsx                 # Nav responsive con menú hamburguesa móvil
@@ -256,8 +257,8 @@ src/
 │   │   ├── MultasPanel.tsx
 │   │   ├── ActividadesPanel.tsx
 │   │   ├── UsuariosPanel.tsx
-│   │   ├── DocenteQrPanel.tsx  # QR de la clase para escanear (docente/admin)
-│   │   ├── MarcarPanel.tsx     # Escáner del alumno (lee el QR del docente)
+│   │   ├── DocenteQrPanel.tsx  # QR + código de la clase para escanear (docente/admin)
+│   │   ├── MarcarPanel.tsx     # Alumno: escáner del QR del docente, token manual y código de clase
 │   │   └── ScanPanel.tsx       # Escaneo docente (respaldo) + apertura manual
 │   └── ui/                     # Primitivas reutilizables
 │       ├── Badge.tsx           # Etiqueta de estado (green/amber/red/blue/slate)
@@ -380,3 +381,5 @@ npm run dev        # http://localhost:3000
 36. **Gestión de Usuarios** (`/usuarios`): edición de perfil y restablecimiento de contraseñas (solo admin), con opción de exigir cambio en el próximo ingreso.
 37. **Recuperación de contraseña** (`/recuperar`): link en el login, verificación de identidad con correo + DNI y cambio de clave autoservicio.
 38. **Contraseñas seguras**: mínimo 10 caracteres con mayúscula, minúscula, número y símbolo, con verificador de fortaleza en vivo en todos los formularios.
+39. **Justificación de faltas/tardanzas**: el registro pasa a **Presente** y la multa asociada se anula.
+40. **Código de clase**: el docente muestra un código de 6 dígitos junto al QR (rota cada 30 s); el alumno puede marcar escribiendo el código + su nombre desde `/marcar`. En el Taller la asistencia es opcional y no penaliza.
