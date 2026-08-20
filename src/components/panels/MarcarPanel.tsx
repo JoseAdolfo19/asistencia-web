@@ -14,26 +14,45 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const processingRef = useRef(false);
+  const resultRef = useRef<HTMLDivElement | null>(null);
 
   async function marcar(raw: string) {
     if (processingRef.current) return;
     processingRef.current = true;
     setLoading(true);
     setResult(null);
-
-    // El QR del docente solo lleva el token; si llegara un QR de alumno (token|alumno)
-    // se toma solo el token.
-    const token = String(raw || "").trim().split("|")[0];
-    const res = await marcarConQrDocente(token);
-    setResult(
-      res.ok
-        ? { ok: true, msg: `Asistencia: ${res.estado} en ${res.curso}` }
-        : { ok: false, msg: res.error }
-    );
-
-    processingRef.current = false;
-    setLoading(false);
+    let ok = false;
+    let msg = "";
+    try {
+      // El QR del docente solo lleva el token; si llegara un QR de alumno (token|alumno)
+      // se toma solo el token.
+      const token = String(raw || "").trim().split("|")[0];
+      const res = await marcarConQrDocente(token);
+      if (res.ok) {
+        ok = true;
+        msg = `Asistencia registrada: ${res.estado} en ${res.curso}`;
+      } else {
+        ok = false;
+        msg = res.error;
+      }
+    } catch {
+      ok = false;
+      msg = "Error al registrar la asistencia. Intenta de nuevo.";
+    } finally {
+      processingRef.current = false;
+      setLoading(false);
+      setResult({ ok, msg });
+      // Si falló (QR expirado/cámara), reanuda el escáner rápido; si marcó, deja
+      // la confirmación visible unos segundos antes de volver a escanear.
+      if (scannerRef.current && scannerOn) {
+        setTimeout(() => scannerRef.current?.resume(), ok ? 4000 : 1500);
+      }
+    }
   }
+
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [result]);
 
   function startScanner() {
     const scanner = new Html5Qrcode(CAMERA_ID);
@@ -45,7 +64,6 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
         (decodedText) => {
           marcar(decodedText);
           scanner.pause();
-          setTimeout(() => scanner.resume(), 2500);
         },
         () => {}
       )
@@ -114,12 +132,16 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
       </div>
 
       {loading && <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">Procesando...</p>}
+
       {result && !loading && (
         <div
-          className={`mt-4 rounded-lg px-4 py-3 text-sm ${
-            result.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
+          ref={resultRef}
+          role="status"
+          className={`mt-4 rounded-xl px-4 py-5 text-center text-base font-semibold ${
+            result.ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"
           }`}
         >
+          <span className="block text-4xl">{result.ok ? "✔" : "✕"}</span>
           {result.msg}
         </div>
       )}
