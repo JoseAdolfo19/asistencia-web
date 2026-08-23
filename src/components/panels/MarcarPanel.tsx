@@ -3,37 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { marcarConQrDocente, marcarConCodigo } from "@/lib/marcar";
-import { marcarClaseLocal, getClaseLocalPara, type ClaseLocalInfo } from "@/lib/claseLocal";
 import Button from "@/components/ui/Button";
 
 const CAMERA_ID = "qr-reader-alumno";
 
-export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; claseLocal: ClaseLocalInfo | null }) {
+export default function MarcarPanel({ nombre }: { nombre: string }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
   const [codigoClase, setCodigoClase] = useState("");
   const [nombreConfirm, setNombreConfirm] = useState(nombre);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [claseLocalData, setClaseLocalData] = useState<ClaseLocalInfo | null>(claseLocal);
   const processingRef = useRef(false);
   const resultRef = useRef<HTMLDivElement | null>(null);
-
-  // Refresca la clase local (registros de Daniela) cada 15 s para que la vista
-  // de Jose se actualice sin recargar la página.
-  useEffect(() => {
-    let activo = true;
-    async function refrescar() {
-      const res = await getClaseLocalPara();
-      if (activo && res.ok) setClaseLocalData(res.data);
-    }
-    refrescar();
-    const id = setInterval(refrescar, 15_000);
-    return () => {
-      activo = false;
-      clearInterval(id);
-    };
-  }, []);
 
   async function marcar(raw: string) {
     if (processingRef.current) return;
@@ -61,11 +43,6 @@ export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; cl
       processingRef.current = false;
       setLoading(false);
       setResult({ ok, msg });
-      // Si falló (QR expirado/cámara), reanuda el escáner rápido; si marcó, deja
-      // la confirmación visible unos segundos antes de volver a escanear.
-      if (scannerRef.current && scannerOn) {
-        setTimeout(() => scannerRef.current?.resume(), ok ? 4000 : 1500);
-      }
     }
   }
 
@@ -88,34 +65,6 @@ export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; cl
     } catch {
       ok = false;
       msg = "Error al registrar la asistencia. Intenta de nuevo.";
-    } finally {
-      processingRef.current = false;
-      setLoading(false);
-      setResult({ ok, msg });
-    }
-  }
-
-  async function marcarClase() {
-    if (!claseLocalData || processingRef.current) return;
-    processingRef.current = true;
-    setLoading(true);
-    setResult(null);
-    let ok = false;
-    let msg = "";
-    try {
-      const res = await marcarClaseLocal(claseLocalData.id);
-      if (res.ok) {
-        ok = true;
-        msg = `Asistencia registrada en la clase local: ${res.estado}`;
-        const ref = await getClaseLocalPara();
-        if (ref.ok) setClaseLocalData(ref.data);
-      } else {
-        ok = false;
-        msg = res.error;
-      }
-    } catch {
-      ok = false;
-      msg = "Error al registrar. Intenta de nuevo.";
     } finally {
       processingRef.current = false;
       setLoading(false);
@@ -221,58 +170,6 @@ export default function MarcarPanel({ nombre, claseLocal }: { nombre: string; cl
             </p>
           </div>
         </div>
-        {claseLocalData && (
-          <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 shadow-sm">
-            <h2 className="mb-2 font-semibold text-purple-800">{claseLocalData.nombre}</h2>
-            {claseLocalData.puedoMarcar ? (
-              <>
-                <p className="text-sm text-purple-700">
-                  Clase de prueba: registra tu asistencia aquí (es voluntaria y no genera multas).
-                </p>
-                <div className="mt-3 flex items-center gap-3">
-                  <Button onClick={marcarClase} disabled={loading || claseLocalData.marcadaHoy} size="lg">
-                    {claseLocalData.marcadaHoy ? "Ya marcaste hoy" : "Marcar en clase local"}
-                  </Button>
-                  {claseLocalData.marcadaHoy && (
-                    <span className="text-sm font-semibold text-green-700">✔ Asistencia registrada hoy</span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-purple-700">
-                  Clase local de Daniela HUANCA MIRANDA. Puedes ver los registros, pero no marcar.
-                </p>
-                {claseLocalData.marcadaHoy && (
-                  <p className="mt-2 text-sm font-semibold text-green-700">
-                    ✔ Daniela marcó hoy a las{" "}
-                    {(() => {
-                      const d = new Date();
-                      const hoyStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-                        d.getDate()
-                      ).padStart(2, "0")}`;
-                      return claseLocalData.registros.find((r) => r.fecha === hoyStr)?.hora ?? "";
-                    })()}
-                  </p>
-                )}
-              </>
-            )}
-            {claseLocalData.registros.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-purple-500">Últimos registros</p>
-                <ul className="mt-1 space-y-1 text-sm text-purple-800">
-                  {claseLocalData.registros.map((r, i) => (
-                    <li key={i} className="flex justify-between gap-2">
-                      <span>{r.fecha}</span>
-                      <span className="text-purple-500">{r.hora}</span>
-                      <span className="font-medium">{r.estado}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {loading && <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">Procesando...</p>}
