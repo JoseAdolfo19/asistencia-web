@@ -9,15 +9,16 @@ export const dynamic = "force-dynamic";
 export default async function EscanearPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.rol === "Administrador") redirect("/dashboard");
 
-  const puedeEscanear = session.rol === "Docente" || session.rol === "Administrador";
+  const puedeEscanear = session.rol === "Docente";
 
   if (!puedeEscanear) {
     return (
       <div>
         <h1 className="text-xl font-bold text-blue-900">Escanear QR</h1>
         <p className="mt-2 text-slate-500">
-          Esta función es para docentes y administradores. Inicia sesión con una cuenta de docente para marcar asistencia.
+          Esta función es para docentes. Inicia sesión con una cuenta de docente para marcar asistencia.
         </p>
       </div>
     );

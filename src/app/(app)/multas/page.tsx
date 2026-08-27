@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function MultasPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.rol === "Administrador") redirect("/dashboard");
 
   const esAlumno = session.rol === "Alumno";
   const puedeCobrar = session.rol === "Tesorera" || session.rol === "Administrador";

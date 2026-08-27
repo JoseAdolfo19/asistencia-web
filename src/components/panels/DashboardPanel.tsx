@@ -42,22 +42,20 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
       const regs = (asis ?? []) as { fecha: string; curso: string; estado: string; justificada?: boolean }[];
       const filasMultas = (ms ?? []) as { estado: string; monto: number }[];
 
-      // Estado hoy
+      // Estado hoy (solo Presente / Tardanza / Falta)
       const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(new Date());
       const hoyRegs = regs.filter((r) => r.fecha === hoy);
       const contar = (arr: typeof hoyRegs) =>
         ["Presente", "Tardanza", "Falta"]
-          .map((estado) => ({ estado, total: arr.filter((r) => r.estado === estado && !r.justificada).length }))
+          .map((estado) => ({ estado, total: arr.filter((r) => r.estado === estado).length }))
           .filter((c) => c.total > 0);
-      const justHoy = hoyRegs.filter((r) => r.justificada).length;
-      setEstadoHoy([...contar(hoyRegs), ...(justHoy > 0 ? [{ estado: "Justificada", total: justHoy }] : [])]);
+      setEstadoHoy(contar(hoyRegs));
 
       // Por curso (todos los registros)
-      const porCursoMap = new Map<string, { Presente: number; Tardanza: number; Falta: number; Justificada: number }>();
+      const porCursoMap = new Map<string, { Presente: number; Tardanza: number; Falta: number }>();
       for (const r of regs) {
-        const c = porCursoMap.get(r.curso) ?? { Presente: 0, Tardanza: 0, Falta: 0, Justificada: 0 };
-        if (r.justificada) c.Justificada++;
-        else if (r.estado === "Presente") c.Presente++;
+        const c = porCursoMap.get(r.curso) ?? { Presente: 0, Tardanza: 0, Falta: 0 };
+        if (r.estado === "Presente") c.Presente++;
         else if (r.estado === "Tardanza") c.Tardanza++;
         else if (r.estado === "Falta") c.Falta++;
         porCursoMap.set(r.curso, c);
@@ -72,10 +70,9 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
           const delDia = regs.filter((r) => r.fecha === fecha);
           return {
             fecha: fecha.slice(5),
-            Presente: delDia.filter((r) => r.estado === "Presente" && !r.justificada).length,
-            Tardanza: delDia.filter((r) => r.estado === "Tardanza" && !r.justificada).length,
-            Falta: delDia.filter((r) => r.estado === "Falta" && !r.justificada).length,
-            Justificada: delDia.filter((r) => r.justificada).length,
+            Presente: delDia.filter((r) => r.estado === "Presente").length,
+            Tardanza: delDia.filter((r) => r.estado === "Tardanza").length,
+            Falta: delDia.filter((r) => r.estado === "Falta").length,
           };
         })
       );

@@ -8,6 +8,10 @@ import {
   QR_REFRESH_SECONDS,
   generarCodigoClase,
   codigoValido,
+  generarFirmaDia,
+  firmaDiaValida,
+  generarCodigoDia,
+  codigoDiaValido,
 } from "@/lib/qr";
 
 const SECRET = "test_secret";
@@ -122,5 +126,49 @@ describe("qrSecret", () => {
     // No se manipula process.env para no afectar otros tests; solo se valida el tipo.
     expect(typeof qrSecret()).toBe("string");
     expect(QR_REFRESH_SECONDS).toBe(30);
+  });
+});
+
+describe("QR / código de día (estático, no rota)", () => {
+  it("generarFirmaDia es estable todo el día (sin seed)", () => {
+    const a = generarFirmaDia(FECHA, "asistencia", SECRET);
+    const b = generarFirmaDia(FECHA, "asistencia", SECRET);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(a).toBe(b);
+  });
+
+  it("asistencia y tardanza generan firmas distintas", () => {
+    expect(generarFirmaDia(FECHA, "asistencia", SECRET)).not.toBe(
+      generarFirmaDia(FECHA, "tardanza", SECRET)
+    );
+  });
+
+  it("firmaDiaValida acepta solo el tipo y fecha correctos", () => {
+    const tokAsis = generarFirmaDia(FECHA, "asistencia", SECRET);
+    const tokTard = generarFirmaDia(FECHA, "tardanza", SECRET);
+    expect(firmaDiaValida(tokAsis, FECHA, "asistencia", SECRET)).toBe(true);
+    expect(firmaDiaValida(tokAsis, FECHA, "tardanza", SECRET)).toBe(false);
+    expect(firmaDiaValida(tokTard, FECHA, "tardanza", SECRET)).toBe(true);
+    expect(firmaDiaValida(tokAsis, "2026-08-19", "asistencia", SECRET)).toBe(false);
+    expect(firmaDiaValida(tokAsis, FECHA, "asistencia", "otro_secret")).toBe(false);
+    expect(firmaDiaValida("basura", FECHA, "asistencia", SECRET)).toBe(false);
+  });
+
+  it("generarCodigoDia produce 6 dígitos estables y distintos por tipo", () => {
+    const a = generarCodigoDia(FECHA, "asistencia", SECRET);
+    const b = generarCodigoDia(FECHA, "asistencia", SECRET);
+    expect(a).toMatch(/^\d{6}$/);
+    expect(a).toBe(b);
+    expect(generarCodigoDia(FECHA, "tardanza", SECRET)).not.toBe(a);
+  });
+
+  it("codigoDiaValido acepta solo el tipo correcto y rechaza inválidos", () => {
+    const cod = generarCodigoDia(FECHA, "tardanza", SECRET);
+    expect(codigoDiaValido(cod, FECHA, "tardanza", SECRET)).toBe(true);
+    expect(codigoDiaValido(cod, FECHA, "asistencia", SECRET)).toBe(false);
+    expect(codigoDiaValido(cod, FECHA, "tardanza", "x")).toBe(false);
+    expect(codigoDiaValido("123456", FECHA, "tardanza", SECRET)).toBe(false);
+    expect(codigoDiaValido("12ab", FECHA, "tardanza", SECRET)).toBe(false);
+    expect(codigoDiaValido("", FECHA, "tardanza", SECRET)).toBe(false);
   });
 });

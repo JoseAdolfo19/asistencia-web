@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/txt_titulo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Marcar Asistencia"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="16dp">
+
+        <!-- Opción 1: Escanear QR -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#F0F8FF"
+            android:layout_margin="8dp"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/txt_instruccion_qr"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Escanear QR del docente"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <ImageView
+                android:id="@+id/iv_qr_preview"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_qr_placeholder"
+                android:scaleType="centerCrop"/>
+
+            <Button
+                android:id="@+id/btn_marcar_qr"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Escanear QR"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+
+        <!-- Opción 2: Código de Día -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#F0F8FF"
+            android:layout_margin="8dp"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/txt_instruccion_codigo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Código de Día"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/et_codigo_dia"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Código de 6 dígitos"
+                    android:inputType="number"
+                    android:maxLength="6"/>
+
+                <Button
+                    android:id="@+id/btn_limpiar_codigo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Limpiar"/>
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_nombre"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Tu nombre completo"
+                android:layout_marginTop="8dp"/>
+
+            <Button
+                android:id="@+id/btn_marcar_codigo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Marcar con Código de Día"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/txt_instrucciones"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Puedes marcar usando el QR del docente o ingresando tu código de día.\nEl código de día es válido para todo el día y no genera multas."/>
+</LinearLayout>

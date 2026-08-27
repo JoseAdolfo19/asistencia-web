@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/session";
 import { estadoClase, esPrimeraClase, esAlumno, esAlumnoRegistrado, fechaHoy, diaHoy, horaAhora, normalizeName, aMinutos } from "@/lib/estado";
 import { permitirRateLimit } from "@/lib/rateLimit";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { qrSecret, firmaValida, generarFirmaQR, generarCodigoClase, codigoValido, firmaDiaValida, codigoDiaValido, generarFirmaDia, generarCodigoDia } from "@/lib/qr";
+import { qrSecret, firmaValida, generarFirmaQR, generarCodigoClase, codigoValido } from "@/lib/qr";
 import { planificarCierre, planificarSubirFaltas, ClaseCierre, FaltaPendiente } from "@/lib/cierre";
 
 export type MarcarResult = { ok: true; estado: string; curso: string } | { ok: false; error: string };
@@ -30,7 +30,7 @@ type BaseDia = {
   opcionales: Set<string>;
 };
 
-// Datos estables del día (config, cursos opcionales y horario). Se cachean un minuto
+// Datos estables del dÃ­a (config, cursos opcionales y horario). Se cachean un minuto
 // para no repetir lecturas en cada escaneo; lo mutable (clases_abiertas, asistencia)
 // siempre se lee fresco.
 let cacheBase: { ts: number; base: BaseDia } | null = null;
@@ -47,7 +47,7 @@ async function cargarBaseDia(): Promise<BaseDia> {
 
   const montoTardanza = Number(configRes.data?.[0]?.multa_tardanza) || 1;
   // Cursos con asistencia_obligatoria = false: tienen QR, pero la asistencia es
-  // opcional (el cierre automático no penaliza por no marcar).
+  // opcional (el cierre automÃ¡tico no penaliza por no marcar).
   const opcionales = new Set((cursosRes.data ?? []).map((c) => normalizeName(c.nombre)));
   const hoy = diaHoy();
   const lista = ((horarioRes.data ?? []) as ClaseParaToken[]).filter(
@@ -59,30 +59,9 @@ async function cargarBaseDia(): Promise<BaseDia> {
   return base;
 }
 
-// ---------------------------------------------------------------------------
-// Marca por día (QR/código estático, no rota cada 30 s).
-//
-// Dos QRs por día, válidos en ventanas horarias fijas:
-//   - "asistencia": de 08:00 a 08:30  -> Presente
-//   - "tardanza":   de 09:00 a 10:00  -> Tardanza
-// Ambos se asocian a la primera clase obligatoria del día (la de las 8:00).
-// ---------------------------------------------------------------------------
-const VENTANA_ASISTENCIA = { inicio: 8 * 60, fin: 8 * 60 + 30 }; // 08:00 - 08:30
-const VENTANA_TARDANZA = { inicio: 9 * 60, fin: 10 * 60 }; // 09:00 - 10:00
-
-// Devuelve el nombre de la primera clase obligatoria del día (la de hora de
-// inicio más temprana, excluyendo los cursos opcionales / asistencia no
-// obligatoria). Es el curso al que se asocian las marcas de día.
-function primeraClaseObligatoria(lista: ClaseParaToken[], opcionales: Set<string>): string | null {
-  const obligatorias = (lista ?? []).filter((h) => !opcionales.has(normalizeName(h.curso)));
-  if (obligatorias.length === 0) return null;
-  obligatorias.sort((a, b) => aMinutos(a.hora_inicio) - aMinutos(b.hora_inicio));
-  return obligatorias[0].curso;
-}
-
 // El cierre completo es costoso (genera Faltas/Tardanzas de todos los que no marcaron).
-// Se ejecuta como máximo una vez por minuto; es idempotente, así que entre medias
-// basta con el resultado del último cierre.
+// Se ejecuta como mÃ¡ximo una vez por minuto; es idempotente, asÃ­ que entre medias
+// basta con el resultado del Ãºltimo cierre.
 let ultimoCierreCompleto = 0;
 const INTERVALO_CIERRE_MS = 60_000;
 
@@ -90,7 +69,7 @@ export async function resolverAlumno(nombre: string): Promise<
   { ok: true; id: string; nombreCompleto: string } | { ok: false; error: string }
 > {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!session) return { ok: false, error: "SesiÃ³n expirada" };
   if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores" };
 
   const q = String(nombre || "").trim();
@@ -108,8 +87,8 @@ export async function resolverAlumno(nombre: string): Promise<
     .filter((a) => esAlumnoRegistrado(a.id))
     .filter((a) => normalizeName(a.nombres + " " + a.apellidos) === target);
 
-  if (candidatos.length === 0) return { ok: false, error: "No se encontró un alumno con ese nombre" };
-  if (candidatos.length > 1) return { ok: false, error: "Hay varios alumnos con ese nombre; sé más específico" };
+  if (candidatos.length === 0) return { ok: false, error: "No se encontrÃ³ un alumno con ese nombre" };
+  if (candidatos.length > 1) return { ok: false, error: "Hay varios alumnos con ese nombre; sÃ© mÃ¡s especÃ­fico" };
 
   const a = candidatos[0];
   return { ok: true, id: a.id, nombreCompleto: `${a.nombres} ${a.apellidos}` };
@@ -117,7 +96,7 @@ export async function resolverAlumno(nombre: string): Promise<
 
 export type QrTokenResult = { ok: true; token: string; codigo: string } | { ok: false; error: string };
 
-// Valida que la clase sea de hoy, no excluida y esté en ventana (activa o cerrada)
+// Valida que la clase sea de hoy, no excluida y estÃ© en ventana (activa o cerrada)
 // y firma el token compartido de esa clase.
 async function tokenDeClaseActiva(
   claseId: number,
@@ -126,7 +105,7 @@ async function tokenDeClaseActiva(
   seed: number
 ): Promise<QrTokenResult> {
   const id = Number(claseId);
-  if (!id) return { ok: false, error: "Clase inválida" };
+  if (!id) return { ok: false, error: "Clase invÃ¡lida" };
 
   const base = await cargarBaseDia();
 
@@ -150,7 +129,7 @@ async function tokenDeClaseActiva(
 
   const est = estadoClase(h, aperturaManual, primera);
   if (est !== "Activa" && est !== "Cerrada") {
-    return { ok: false, error: "La clase no está en ventana de marcación" };
+    return { ok: false, error: "La clase no estÃ¡ en ventana de marcaciÃ³n" };
   }
 
   const token = generarFirmaQR(h.id, h.curso, fechaHoy(), seed, qrSecret());
@@ -166,54 +145,15 @@ export async function getDocenteQrToken(
   seed: number
 ): Promise<QrTokenResult> {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!session) return { ok: false, error: "SesiÃ³n expirada" };
   if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores pueden mostrar el QR" };
 
-  // Máximo 12 tokens por minuto por docente
+  // MÃ¡ximo 12 tokens por minuto por docente
   if (!(await permitirRateLimit(`qrdocente:${session.id}`, 12, 60_000))) {
     return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
   }
 
   return tokenDeClaseActiva(claseId, curso, fecha, seed);
-}
-
-export type QrDiaResult = {
-  ok: true;
-  fecha: string;
-  asistencia: { token: string; codigo: string; activo: boolean; disponible: boolean };
-  tardanza: { token: string; codigo: string; activo: boolean; disponible: boolean };
-} | { ok: false; error: string };
-
-// Devuelve los 2 QRs/códigos estáticos del día (asistencia y tardanza) para que
-// el docente los muestre. No rotan cada 30 s. 'activo' indica si estamos dentro de
-// su ventana horaria; 'disponible' si todavía no ha terminado su ventana.
-export async function getDocenteQrDia(): Promise<QrDiaResult> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
-  if (!puedeEscanear(session.rol)) {
-    return { ok: false, error: "Solo docentes o administradores pueden mostrar el QR" };
-  }
-
-  const hoyStr = fechaHoy();
-  const ahoraMin = aMinutos(horaAhora());
-  const secret = qrSecret();
-
-  return {
-    ok: true,
-    fecha: hoyStr,
-    asistencia: {
-      token: generarFirmaDia(hoyStr, "asistencia", secret),
-      codigo: generarCodigoDia(hoyStr, "asistencia", secret),
-      activo: ahoraMin >= VENTANA_ASISTENCIA.inicio && ahoraMin < VENTANA_ASISTENCIA.fin,
-      disponible: ahoraMin < VENTANA_ASISTENCIA.fin,
-    },
-    tardanza: {
-      token: generarFirmaDia(hoyStr, "tardanza", secret),
-      codigo: generarCodigoDia(hoyStr, "tardanza", secret),
-      activo: ahoraMin >= VENTANA_TARDANZA.inicio && ahoraMin < VENTANA_TARDANZA.fin,
-      disponible: ahoraMin < VENTANA_TARDANZA.fin,
-    },
-  };
 }
 
 export type CierreResult = {
@@ -224,8 +164,8 @@ export type CierreResult = {
   error?: string;
 };
 
-// Sube a Tardanza las Faltas de hoy de un alumno que sí llegó (p.ej. a otra clase del día),
-// y le genera la multa de tardanza si aún no existe.
+// Sube a Tardanza las Faltas de hoy de un alumno que sÃ­ llegÃ³ (p.ej. a otra clase del dÃ­a),
+// y le genera la multa de tardanza si aÃºn no existe.
 async function subirFaltasSiLlego(
   alumnoId: string,
   hoyStr: string,
@@ -254,7 +194,7 @@ async function subirFaltasSiLlego(
     (faltas ?? []) as FaltaPendiente[],
     (multas ?? []) as { motivo: string | null; asistencia_id: number | null }[],
     alumnoId,
-    (curso) => "No escaneó su QR en " + curso
+    (curso) => "No escaneÃ³ su QR en " + curso
   );
   for (const f of plan.actualizar) {
     const { error } = await supabaseAdmin.from("asistencia").update({ estado: "Tardanza" }).eq("id", f.id);
@@ -282,7 +222,7 @@ async function subirFaltasSiLlego(
 
 export async function cerrarClasesPendientes(): Promise<CierreResult> {
   const session = await getSession();
-  if (!session) return { ok: false, cerradas: [], tardanzas: 0, faltas: 0, error: "Sesión expirada" };
+  if (!session) return { ok: false, cerradas: [], tardanzas: 0, faltas: 0, error: "SesiÃ³n expirada" };
 
   if (Date.now() - ultimoCierreCompleto < INTERVALO_CIERRE_MS) {
     return { ok: true, cerradas: [], tardanzas: 0, faltas: 0 };
@@ -293,7 +233,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
   const ahora = horaAhora();
   const ahoraMin = aMinutos(ahora);
 
-  // Config, cursos y horario vienen de la cache del día; lo mutable se lee fresco.
+  // Config, cursos y horario vienen de la cache del dÃ­a; lo mutable se lee fresco.
   const base = await cargarBaseDia();
 
   const [abiertasRes, asisRes, alumnosRes] = await Promise.all([
@@ -309,7 +249,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
   const aperturaPorCurso = new Map<string, string>();
   for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
 
-  // Registros de hoy: quiénes llegaron (Presente/Tardanza) y quiénes marcaron cada curso
+  // Registros de hoy: quiÃ©nes llegaron (Presente/Tardanza) y quiÃ©nes marcaron cada curso
   const llegaronHoy = new Set<string>();
   const marcaronCurso = new Map<string, Set<string>>();
   for (const a of asisHoy ?? []) {
@@ -320,7 +260,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
   }
 
   // Cierra y penaliza solo los cursos obligatorios: los opcionales (Taller)
-  // tienen QR pero el cierre automático no genera Falta/Tardanza ni multas.
+  // tienen QR pero el cierre automÃ¡tico no genera Falta/Tardanza ni multas.
   const clasesHoy = (base.lista as ClaseCierre[]).filter(
     (h) => !base.opcionales.has(normalizeName(h.curso))
   );
@@ -363,7 +303,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
       .map((r) => ({
         alumno: r.alumno,
         tipo: "Tardanza",
-        motivo: "No escaneó su QR en " + p.curso,
+        motivo: "No escaneÃ³ su QR en " + p.curso,
         monto: montoTardanza,
         fecha: hoyStr,
         estado: "Pendiente",
@@ -402,7 +342,7 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
 
 export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: string }> {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!session) return { ok: false, error: "SesiÃ³n expirada" };
   if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores" };
 
   const hoy = fechaHoy();
@@ -410,7 +350,7 @@ export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: 
   const hoyDia = diaHoy();
   const ahoraMin = aMinutos(ahora);
 
-  // Busca la clase de hoy con ese curso para validar que aún no terminó
+  // Busca la clase de hoy con ese curso para validar que aÃºn no terminÃ³
   const { data: horario } = await supabaseAdmin
     .from("horario")
     .select("*")
@@ -421,7 +361,7 @@ export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: 
   if (h) {
     const finMin = aMinutos(h.hora_fin);
     if (ahoraMin >= finMin) {
-      return { ok: false, error: "La clase ya terminó hoy (" + h.hora_fin + "). No se puede abrir." };
+      return { ok: false, error: "La clase ya terminÃ³ hoy (" + h.hora_fin + "). No se puede abrir." };
     }
   } else {
     return { ok: false, error: "No hay una clase de " + curso + " hoy" };
@@ -449,19 +389,19 @@ export async function abrirClase(curso: string): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-// Procesa un token o código de clase para un alumno: valida la firma/código,
-// registra Presente/Tardanza, crea la multa si aplica y sube Faltas previas del día a Tardanza.
+// Procesa un token o cÃ³digo de clase para un alumno: valida la firma/cÃ³digo,
+// registra Presente/Tardanza, crea la multa si aplica y sube Faltas previas del dÃ­a a Tardanza.
 async function marcarPorToken(
   token: string,
   alumnoId: string,
   actorNombre: string,
   viaCodigo = false
 ): Promise<MarcarResult> {
-  // Procesa cierres automáticos de clases y faltas/tardanzas pendientes antes de marcar
+  // Procesa cierres automÃ¡ticos de clases y faltas/tardanzas pendientes antes de marcar
   await cerrarClasesPendientes();
 
   const t = String(token || "").trim();
-  if (!t) return { ok: false, error: "Token vacío" };
+  if (!t) return { ok: false, error: "Token vacÃ­o" };
 
   const { montoTardanza, lista } = await cargarBaseDia();
 
@@ -494,8 +434,8 @@ async function marcarPorToken(
     return {
       ok: false,
       error: viaCodigo
-        ? "Código inválido o expirado. Pide un código nuevo."
-        : "QR inválido o expirado. Pide un QR nuevo.",
+        ? "CÃ³digo invÃ¡lido o expirado. Pide un cÃ³digo nuevo."
+        : "QR invÃ¡lido o expirado. Pide un QR nuevo.",
     };
   }
 
@@ -506,8 +446,8 @@ async function marcarPorToken(
     .eq("curso", encontrada.horario.curso)
     .eq("fecha", hoyStr);
 
-  // Si ya había una Falta automática para esta clase pero el alumno llegó y escaneó,
-  // se sube a Tardanza en vez de rechazarlo (salvo que ya esté justificada).
+  // Si ya habÃ­a una Falta automÃ¡tica para esta clase pero el alumno llegÃ³ y escaneÃ³,
+  // se sube a Tardanza en vez de rechazarlo (salvo que ya estÃ© justificada).
   const previo = (existentes ?? [])[0];
   if (previo) {
     if (previo.estado === "Falta" && !previo.justificada) {
@@ -516,7 +456,7 @@ async function marcarPorToken(
       if (errores.length > 0) return { ok: false, error: errores[0] };
       await registrarAuditoria(
         "marcar_asistencia",
-        `${actorNombre} subió Falta a Tardanza a ${alumnoId} en ${encontrada.horario.curso}`
+        `${actorNombre} subiÃ³ Falta a Tardanza a ${alumnoId} en ${encontrada.horario.curso}`
       );
       return { ok: true, estado: "Tardanza", curso: encontrada.horario.curso };
     }
@@ -542,7 +482,7 @@ async function marcarPorToken(
     const { error: errMulta } = await supabaseAdmin.from("multas").insert({
       alumno: alumnoId,
       tipo: "Tardanza",
-      motivo: "Llegó después del cierre de lista",
+      motivo: "LlegÃ³ despuÃ©s del cierre de lista",
       monto: montoTardanza,
       fecha: hoyStr,
       estado: "Pendiente",
@@ -551,13 +491,13 @@ async function marcarPorToken(
     if (errMulta) return { ok: false, error: "Asistencia registrada pero no se pudo crear la multa: " + errMulta.message };
   }
 
-  // El alumno llegó hoy: cualquier Falta previa del día sube a Tardanza
+  // El alumno llegÃ³ hoy: cualquier Falta previa del dÃ­a sube a Tardanza
   const { errores } = await subirFaltasSiLlego(alumnoId, hoyStr, montoTardanza);
   if (errores.length > 0) return { ok: false, error: errores[0] };
 
   await registrarAuditoria(
     "marcar_asistencia",
-    `${actorNombre} marcó ${estado} a ${alumnoId} en ${encontrada.horario.curso}`
+    `${actorNombre} marcÃ³ ${estado} a ${alumnoId} en ${encontrada.horario.curso}`
   );
 
   return { ok: true, estado, curso: encontrada.horario.curso };
@@ -565,11 +505,11 @@ async function marcarPorToken(
 
 export async function marcarAsistencia(token: string, alumnoId: string): Promise<MarcarResult> {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!session) return { ok: false, error: "SesiÃ³n expirada" };
   if (!puedeEscanear(session.rol)) return { ok: false, error: "Solo docentes o administradores pueden marcar asistencia" };
-  if (!esAlumnoRegistrado(String(alumnoId || ""))) return { ok: false, error: "Alumno no válido para marcar asistencia" };
+  if (!esAlumnoRegistrado(String(alumnoId || ""))) return { ok: false, error: "Alumno no vÃ¡lido para marcar asistencia" };
 
-  // Máximo 30 marcaciones por minuto por docente (protege contra spam)
+  // MÃ¡ximo 30 marcaciones por minuto por docente (protege contra spam)
   if (!(await permitirRateLimit(`marcar:${session.id}`, 30, 60_000))) {
     return { ok: false, error: "Demasiadas marcaciones. Espera un momento." };
   }
@@ -578,31 +518,31 @@ export async function marcarAsistencia(token: string, alumnoId: string): Promise
 }
 
 // El alumno escanea el QR del docente y se marca su propia asistencia (su identidad
-// sale de la sesión; el token solo identifica la clase activa).
+// sale de la sesiÃ³n; el token solo identifica la clase activa).
 export async function marcarConQrDocente(token: string): Promise<MarcarResult> {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!session) return { ok: false, error: "SesiÃ³n expirada" };
   if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden marcar con el QR del docente" };
   if (!esAlumnoRegistrado(session.id)) return { ok: false, error: "Cuenta no habilitada para marcar asistencia" };
 
-  // Máximo 6 marcaciones por minuto por alumno
+  // MÃ¡ximo 6 marcaciones por minuto por alumno
   if (!(await permitirRateLimit(`marcar:${session.id}`, 6, 60_000))) {
     return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
   }
 
-  return marcarPorDia(token, session.id, session.nombres + " " + session.apellidos);
+  return marcarPorToken(token, session.id, session.nombres + " " + session.apellidos);
 }
 
-// Segunda vía de marcación: el alumno escribe el código de día (6 dígitos, estático)
-// que dicta el docente y confirma su nombre para registrar su asistencia.
+// Segunda vÃ­a de marcaciÃ³n: el alumno escribe el cÃ³digo de clase que dicta el docente
+// (6 dÃ­gitos, rota cada 30s) y confirma su nombre para registrar su asistencia.
 export async function marcarConCodigo(codigo: string, nombre: string): Promise<MarcarResult> {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sesión expirada" };
-  if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden marcar con el código de día" };
+  if (!session) return { ok: false, error: "SesiÃ³n expirada" };
+  if (!esAlumno(session.rol)) return { ok: false, error: "Solo alumnos pueden marcar con el cÃ³digo de clase" };
   if (!esAlumnoRegistrado(session.id)) return { ok: false, error: "Cuenta no habilitada para marcar asistencia" };
 
   const c = String(codigo || "").trim();
-  if (!/^\d{6}$/.test(c)) return { ok: false, error: "El código debe tener 6 dígitos" };
+  if (!/^\d{6}$/.test(c)) return { ok: false, error: "El cÃ³digo debe tener 6 dÃ­gitos" };
 
   // El nombre confirma la identidad y debe coincidir con la cuenta
   const nombreCompleto = session.nombres + " " + session.apellidos;
@@ -610,119 +550,10 @@ export async function marcarConCodigo(codigo: string, nombre: string): Promise<M
     return { ok: false, error: "El nombre no coincide con tu cuenta" };
   }
 
-  // Máximo 6 marcaciones por minuto por alumno
+  // MÃ¡ximo 6 marcaciones por minuto por alumno
   if (!(await permitirRateLimit(`marcar:${session.id}`, 6, 60_000))) {
     return { ok: false, error: "Demasiadas solicitudes. Espera un momento." };
   }
 
-  return marcarPorDia(c, session.id, session.nombres + " " + session.apellidos);
-}
-
-// Procesa la marcación por DÍA (QR/código estático):
-//  - "asistencia": dentro de 08:00-08:30 -> Presente
-//  - "tardanza":   dentro de 09:00-10:00 -> Tardanza
-// Asociado a la primera clase obligatoria del día.
-async function marcarPorDia(token: string, alumnoId: string, actorNombre: string): Promise<MarcarResult> {
-  const t = String(token || "").trim();
-  if (!t) return { ok: false, error: "Token vacío" };
-
-  // Procesa cierres automáticos de clases y faltas/tardanzas pendientes antes de marcar
-  await cerrarClasesPendientes();
-
-  const hoyStr = fechaHoy();
-  const ahoraMin = aMinutos(horaAhora());
-  const secret = qrSecret();
-
-  // Determina el tipo de marca según la firma/código de día
-  let tipo: "asistencia" | "tardanza" | null = null;
-  if (firmaDiaValida(t, hoyStr, "asistencia", secret) || codigoDiaValido(t, hoyStr, "asistencia", secret)) {
-    tipo = "asistencia";
-  } else if (firmaDiaValida(t, hoyStr, "tardanza", secret) || codigoDiaValido(t, hoyStr, "tardanza", secret)) {
-    tipo = "tardanza";
-  }
-  if (!tipo) {
-    return { ok: false, error: "QR o código inválido. Pide uno nuevo al docente." };
-  }
-
-  // Valida la ventana horaria de cada tipo
-  const ventana = tipo === "asistencia" ? VENTANA_ASISTENCIA : VENTANA_TARDANZA;
-  if (ahoraMin < ventana.inicio || ahoraMin >= ventana.fin) {
-    const texto =
-      tipo === "asistencia"
-        ? "El QR de asistencia solo es válido de 8:00 a 8:30."
-        : "El QR de tardanza solo es válido de 9:00 a 10:00.";
-    return { ok: false, error: texto };
-  }
-
-  // Curso de referencia: primera clase obligatoria del día
-  const base = await cargarBaseDia();
-  const curso = primeraClaseObligatoria(base.lista, base.opcionales);
-  if (!curso) return { ok: false, error: "No hay clases obligatorias hoy" };
-
-  const { data: existentes } = await supabaseAdmin
-    .from("asistencia")
-    .select("id,estado,justificada")
-    .eq("alumno", alumnoId)
-    .eq("curso", curso)
-    .eq("fecha", hoyStr);
-
-  // Si ya marcó hoy en este curso, no volver a marcar
-  const previo = (existentes ?? [])[0];
-  if (previo) {
-    if (tipo === "tardanza" && previo.estado === "Presente") {
-      // Llegó a tiempo (Presente); la marca de tardanza no puede degradarlo.
-      return { ok: false, error: "Ya registraste tu asistencia de hoy en " + curso };
-    }
-    if (previo.estado === "Falta" && !previo.justificada && tipo === "tardanza") {
-      // Estaba en Falta y ahora llega tarde -> sube a Tardanza
-      await supabaseAdmin.from("asistencia").update({ estado: "Tardanza" }).eq("id", previo.id);
-      const { errores } = await subirFaltasSiLlego(alumnoId, hoyStr, base.montoTardanza);
-      if (errores.length > 0) return { ok: false, error: errores[0] };
-      await registrarAuditoria(
-        "marcar_asistencia",
-        `${actorNombre} subió Falta a Tardanza a ${alumnoId} en ${curso}`
-      );
-      return { ok: true, estado: "Tardanza", curso };
-    }
-    return { ok: false, error: "Ya registraste asistencia en " + curso + " hoy" };
-  }
-
-  const estado = tipo === "asistencia" ? "Presente" : "Tardanza";
-
-  const { data: asisInsertada, error: errAsis } = await supabaseAdmin
-    .from("asistencia")
-    .insert({
-      alumno: alumnoId,
-      curso,
-      fecha: hoyStr,
-      hora: horaAhora(),
-      estado,
-    })
-    .select("id")
-    .single();
-  if (errAsis) return { ok: false, error: "No se pudo registrar: " + errAsis.message };
-
-  if (estado === "Tardanza") {
-    const { error: errMulta } = await supabaseAdmin.from("multas").insert({
-      alumno: alumnoId,
-      tipo: "Tardanza",
-      motivo: "Llegó después de las 8:30 (QR de tardanza)",
-      monto: base.montoTardanza,
-      fecha: hoyStr,
-      estado: "Pendiente",
-      asistencia_id: asisInsertada?.id ?? null,
-    });
-    if (errMulta) return { ok: false, error: "Asistencia registrada pero no se pudo crear la multa: " + errMulta.message };
-  }
-
-  // El alumno llegó hoy: cualquier Falta previa del día sube a Tardanza
-  const { errores } = await subirFaltasSiLlego(alumnoId, hoyStr, base.montoTardanza);
-  if (errores.length > 0) return { ok: false, error: errores[0] };
-
-  await registrarAuditoria(
-    "marcar_asistencia",
-    `${actorNombre} marcó ${estado} a ${alumnoId} en ${curso}`
-  );
-
-  return { ok: true, estado, curso };
+  return marcarPorToken(c, session.id, nombreCompleto, true);
 }

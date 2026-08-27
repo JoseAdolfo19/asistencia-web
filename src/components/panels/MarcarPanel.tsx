@@ -165,8 +165,8 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
               Marcar con código
             </Button>
             <p className="text-xs text-slate-400">
-              El docente muestra un código de 6 dígitos que cambia cada 30 segundos. Sirve cuando no puedes
-              escanear el QR.
+              El docente muestra dos códigos de 6 dígitos (asistencia y tardanza) que no cambian durante el día.
+              Escribe el que corresponde según llegues a tiempo o tarde.
             </p>
           </div>
         </div>
