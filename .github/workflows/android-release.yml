@@ -35,16 +35,16 @@ jobs:
         run: gradle --no-daemon assembleRelease
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/ieslasalle-release.apk
+        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/asistencia-ls-conta.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ieslasalle-release-apk
-          path: mobile-app/app/build/outputs/apk/release/ieslasalle-release.apk
+          name: asistencia-ls-conta-apk
+          path: mobile-app/app/build/outputs/apk/release/asistencia-ls-conta.apk
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: mobile-app/app/build/outputs/apk/release/ieslasalle-release.apk
+          files: mobile-app/app/build/outputs/apk/release/asistencia-ls-conta.apk

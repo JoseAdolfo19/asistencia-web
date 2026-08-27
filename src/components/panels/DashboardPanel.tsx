@@ -20,7 +20,7 @@ type EstadoCount = { estado: string; total: number };
 type PorCurso = { curso: string; Presente: number; Tardanza: number; Falta: number; Justificada: number };
 type PorDia = { fecha: string; Presente: number; Tardanza: number; Falta: number; Justificada: number };
 
-const APK_URL = "https://github.com/JoseAdolfo19/asistencia-web/releases/latest/download/ieslasalle-release.apk";
+const APK_URL = "https://github.com/JoseAdolfo19/asistencia-web/releases/latest/download/asistencia-ls-conta.apk";
 
 const COLORES: Record<string, string> = {
   Presente: "#16a34a",
@@ -115,10 +115,10 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
             </div>
             <a
               href={APK_URL}
-              download="ieslasalle-release.apk"
+              download="asistencia-ls-conta.apk"
               className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
             >
-              Descargar APK
+              Descargar Asistencia LS Conta
             </a>
           </div>
 
