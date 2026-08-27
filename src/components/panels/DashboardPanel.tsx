@@ -20,6 +20,8 @@ type EstadoCount = { estado: string; total: number };
 type PorCurso = { curso: string; Presente: number; Tardanza: number; Falta: number; Justificada: number };
 type PorDia = { fecha: string; Presente: number; Tardanza: number; Falta: number; Justificada: number };
 
+const APK_URL = "https://github.com/JoseAdolfo19/asistencia-web/releases/latest/download/ieslasalle-release.apk";
+
 const COLORES: Record<string, string> = {
   Presente: "#16a34a",
   Tardanza: "#f59e0b",
@@ -106,6 +108,20 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
         <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">Cargando...</p>
       ) : (
         <div className="mt-4 space-y-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-blue-900">Aplicación móvil</h2>
+              <p className="mt-1 text-sm text-blue-800">Descarga la aplicación Android para acceder desde tu celular.</p>
+            </div>
+            <a
+              href={APK_URL}
+              download="ieslasalle-release.apk"
+              className="inline-flex items-center justify-center rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+            >
+              Descargar APK
+            </a>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-white p-4 shadow">
               <p className="text-sm text-slate-500">Asistencia de hoy</p>
