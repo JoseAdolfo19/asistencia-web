@@ -5,7 +5,9 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/icono_asistencia"
         android:label="IES La Salle"
+        android:roundIcon="@drawable/icono_asistencia"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
         <activity
