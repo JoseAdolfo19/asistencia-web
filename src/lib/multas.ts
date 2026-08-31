@@ -62,9 +62,12 @@ export async function crearMultaBuzo(alumnoId: string): Promise<CrearMultaResult
 
 export type JustificarResult = { ok: boolean; error?: string };
 
+export type EstadoJustificacion = "Presente" | "Tardanza" | "Falta";
+
 export async function justificarAsistencia(
   registroId: number,
-  motivo: string
+  motivo: string,
+  estadoFinal: EstadoJustificacion = "Presente"
 ): Promise<JustificarResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sesión expirada" };
@@ -78,6 +81,9 @@ export async function justificarAsistencia(
   if (!id) return { ok: false, error: "Registro inválido" };
   const texto = String(motivo || "").trim();
   if (!texto) return { ok: false, error: "Escribe el motivo de la justificación" };
+  const estado: EstadoJustificacion = ["Presente", "Tardanza", "Falta"].includes(estadoFinal)
+    ? estadoFinal
+    : "Presente";
 
   const { data: fila, error: errSelect } = await supabaseAdmin
     .from("asistencia")
@@ -91,10 +97,11 @@ export async function justificarAsistencia(
     return { ok: false, error: "Solo se puede justificar una Falta o Tardanza" };
   }
 
-  // Marca el registro como justificado y pasa a Presente
+  // Marca el registro como justificado con el estado elegido:
+  // Presente (asistió con motivo), Tardanza (justificado con tardanza) o Falta (justificado con falta)
   const { error: errUpdate } = await supabaseAdmin
     .from("asistencia")
-    .update({ justificada: true, motivo_justificacion: texto, estado: "Presente" })
+    .update({ justificada: true, motivo_justificacion: texto, estado })
     .eq("id", id);
   if (errUpdate) return { ok: false, error: "No se pudo justificar: " + errUpdate.message };
 
@@ -132,7 +139,7 @@ export async function justificarAsistencia(
 
   await registrarAuditoria(
     "justificar_asistencia",
-    `${session.nombres} ${session.apellidos} justificó ${reg.estado} de ${reg.alumno} en ${reg.curso} (${reg.fecha}): ${texto}`
+    `${session.nombres} ${session.apellidos} justificó ${reg.estado} como ${estado} de ${reg.alumno} en ${reg.curso} (${reg.fecha}): ${texto}`
   );
   return { ok: true };
 }

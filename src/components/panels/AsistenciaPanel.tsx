@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { justificarAsistencia } from "@/lib/multas";
 import { exportarExcel } from "@/lib/exportar";
@@ -42,12 +42,23 @@ export default function AsistenciaPanel({
   const [filtroCurso, setFiltroCurso] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
   const [filtroAlumno, setFiltroAlumno] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
   const [rows, setRows] = useState<AsistenciaRow[]>([]);
   const [alumnosMap, setAlumnosMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [justificandoId, setJustificandoId] = useState<number | null>(null);
+  const [justificarRow, setJustificarRow] = useState<AsistenciaRow | null>(null);
+  const [tipoJustificacion, setTipoJustificacion] = useState<"Tardanza" | "Falta">("Falta");
+  const [motivoJustificacion, setMotivoJustificacion] = useState("");
+  const [errorModal, setErrorModal] = useState<string | null>(null);
+
+  const rowsFiltradas = useMemo(() => {
+    if (!filtroEstado) return rows;
+    if (filtroEstado === "Justificada") return rows.filter((a) => a.justificada);
+    return rows.filter((a) => a.estado === filtroEstado);
+  }, [rows, filtroEstado]);
 
   useEffect(() => {
     supabase
@@ -113,24 +124,34 @@ export default function AsistenciaPanel({
     cargar(filtroCurso, filtroFecha, filtroAlumno);
   }, [cargar, filtroCurso, filtroFecha, filtroAlumno]);
 
-  async function justificar(row: AsistenciaRow) {
-    if (justificandoId !== null) return;
-    const motivo = window.prompt(
-      `Motivo de la justificación para ${alumnosMap.get(row.alumno) ?? row.alumno} (${row.estado} en ${row.curso}):`
-    );
-    if (motivo === null) return;
-    if (!motivo.trim()) {
-      setMsg({ ok: false, text: "El motivo es obligatorio." });
+  function abrirJustificar(row: AsistenciaRow) {
+    setTipoJustificacion(row.estado === "Tardanza" ? "Tardanza" : "Falta");
+    setMotivoJustificacion("");
+    setErrorModal(null);
+    setJustificarRow(row);
+  }
+
+  async function confirmarJustificacion() {
+    if (!justificarRow || justificandoId !== null) return;
+    const motivo = motivoJustificacion.trim();
+    if (!motivo) {
+      setErrorModal("El motivo es obligatorio.");
       return;
     }
-    setJustificandoId(row.id);
+    setJustificandoId(justificarRow.id);
     setMsg(null);
-    const res = await justificarAsistencia(row.id, motivo.trim());
+    setErrorModal(null);
+    const res = await justificarAsistencia(justificarRow.id, motivo, tipoJustificacion);
     setJustificandoId(null);
     if (!res.ok) {
+      setErrorModal(res.error || "Error al justificar.");
       setMsg({ ok: false, text: res.error || "Error al justificar." });
     } else {
-      setMsg({ ok: true, text: "Falta/Tardanza justificada: queda como Presente y la multa fue anulada." });
+      setMsg({
+        ok: true,
+        text: `Registro justificado con ${tipoJustificacion === "Tardanza" ? "tardanza" : "falta"} y multa anulada (si existía).`,
+      });
+      setJustificarRow(null);
       cargar(filtroCurso, filtroFecha, filtroAlumno);
     }
   }
@@ -139,7 +160,7 @@ export default function AsistenciaPanel({
     const encabezados = isAdmin
       ? ["Alumno", "Fecha", "Hora", "Curso", "Estado"]
       : ["Fecha", "Hora", "Curso", "Estado"];
-    const filas = rows.map((a) => [
+    const filas = rowsFiltradas.map((a) => [
       ...(isAdmin ? [alumnosMap.get(a.alumno) ?? a.alumno] : []),
       a.fecha,
       a.hora?.slice(0, 5) ?? "",
@@ -155,7 +176,7 @@ export default function AsistenciaPanel({
       string,
       { nombre: string; presente: number; tardanza: number; falta: number; justificadas: number }
     >();
-    for (const a of rows) {
+    for (const a of rowsFiltradas) {
       const e = porAlumno.get(a.alumno) ?? {
         nombre: alumnosMap.get(a.alumno) ?? a.alumno,
         presente: 0,
@@ -215,7 +236,7 @@ export default function AsistenciaPanel({
         </div>
       )}
 
-      <div className="mt-4 grid gap-3 rounded-xl bg-white p-4 shadow sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 rounded-xl bg-white p-4 shadow sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="block text-xs font-medium text-slate-600" htmlFor="filtro-curso">Curso</label>
           <select
@@ -263,27 +284,46 @@ export default function AsistenciaPanel({
           </div>
         )}
 
-        {isAdmin && (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setFiltroCurso("");
-              setFiltroFecha("");
-              setFiltroAlumno("");
-            }}
-            className="mt-auto sm:col-span-3 sm:justify-self-end"
+        <div>
+          <label className="block text-xs font-medium text-slate-600" htmlFor="filtro-estado">Estado</label>
+          <select
+            id="filtro-estado"
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
           >
-            Limpiar filtros
-          </Button>
-        )}
+            <option value="">Todos los estados</option>
+            <option value="Presente">Presente</option>
+            <option value="Tardanza">Tardanza</option>
+            <option value="Falta">Falta</option>
+            <option value="Justificada">Justificadas</option>
+          </select>
+        </div>
 
-        <Button
-          onClick={exportar}
-          disabled={rows.length === 0}
-          className="mt-auto sm:justify-self-end"
-        >
-          Exportar Excel
-        </Button>
+        <div className="flex flex-wrap items-end justify-end gap-2 sm:col-span-2 lg:col-span-4">
+          {isAdmin && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setFiltroCurso("");
+                setFiltroFecha("");
+                setFiltroAlumno("");
+                setFiltroEstado("");
+              }}
+              className="mt-auto"
+            >
+              Limpiar filtros
+            </Button>
+          )}
+
+          <Button
+            onClick={exportar}
+            disabled={rowsFiltradas.length === 0}
+            className="mt-auto"
+          >
+            Exportar Excel
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -321,7 +361,7 @@ export default function AsistenciaPanel({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((a) => (
+                {rowsFiltradas.map((a) => (
                   <tr key={a.id} className="border-t border-slate-100">
                     {isAdmin && (
                       <td className="px-4 py-2 text-slate-700">{alumnosMap.get(a.alumno) ?? a.alumno}</td>
@@ -343,7 +383,7 @@ export default function AsistenciaPanel({
                             size="sm"
                             variant="secondary"
                             disabled={justificandoId === a.id}
-                            onClick={() => justificar(a)}
+                            onClick={() => abrirJustificar(a)}
                           >
                             {justificandoId === a.id ? "..." : "Justificar"}
                           </Button>
@@ -354,13 +394,13 @@ export default function AsistenciaPanel({
                       a.justificada && <td className="px-4 py-2" />}
                   </tr>
                 ))}
-                {rows.length === 0 && (
+                {rowsFiltradas.length === 0 && (
                   <tr>
                     <td
                       colSpan={(isAdmin ? 5 : 4) + (puedeJustificar ? 1 : 0)}
                       className="px-4 py-8 text-center text-slate-400"
                     >
-                      Sin registros de asistencia.
+                      Sin registros que coincidan con los filtros.
                     </td>
                   </tr>
                 )}
@@ -370,7 +410,7 @@ export default function AsistenciaPanel({
 
           {/* Cards (móvil) */}
           <ul className="mt-4 space-y-2 sm:hidden">
-            {rows.map((a) => (
+            {rowsFiltradas.map((a) => (
               <li key={a.id} className="rounded-xl bg-white p-3 shadow">
                 {isAdmin && <p className="font-medium text-slate-800">{alumnosMap.get(a.alumno) ?? a.alumno}</p>}
                 <div className="mt-1 flex items-center justify-between text-sm">
@@ -390,7 +430,7 @@ export default function AsistenciaPanel({
                       size="sm"
                       variant="secondary"
                       disabled={justificandoId === a.id}
-                      onClick={() => justificar(a)}
+                      onClick={() => abrirJustificar(a)}
                       className="mt-2 w-full"
                     >
                       {justificandoId === a.id ? "..." : "Justificar"}
@@ -398,13 +438,74 @@ export default function AsistenciaPanel({
                   )}
               </li>
             ))}
-            {rows.length === 0 && (
+            {rowsFiltradas.length === 0 && (
               <li className="rounded-xl bg-white px-4 py-8 text-center text-sm text-slate-400 shadow">
-                Sin registros de asistencia.
+                Sin registros que coincidan con los filtros.
               </li>
             )}
           </ul>
         </>
+      )}
+
+      {justificarRow && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-base font-bold text-blue-900">Justificar asistencia</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {isAdmin ? `${alumnosMap.get(justificarRow.alumno) ?? justificarRow.alumno} · ` : ""}
+              {justificarRow.curso} · {justificarRow.fecha}
+              {justificarRow.hora ? ` · ${justificarRow.hora.slice(0, 5)}` : ""}
+            </p>
+
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-slate-600" htmlFor="tipo-justificacion">
+                Resultado de la justificación
+              </label>
+              <select
+                id="tipo-justificacion"
+                value={tipoJustificacion}
+                onChange={(e) => setTipoJustificacion(e.target.value as "Tardanza" | "Falta")}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              >
+                <option value="Tardanza">Justificado con tardanza</option>
+                <option value="Falta">Justificado con falta</option>
+              </select>
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-slate-600" htmlFor="motivo-justificacion">
+                Motivo
+              </label>
+              <textarea
+                id="motivo-justificacion"
+                value={motivoJustificacion}
+                onChange={(e) => setMotivoJustificacion(e.target.value)}
+                rows={3}
+                placeholder="Ej.: el alumno asistió pero no pudo escanear el QR..."
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {errorModal && <p className="mt-2 text-sm text-red-600">{errorModal}</p>}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setJustificarRow(null)}
+                disabled={justificandoId !== null}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={confirmarJustificacion} disabled={justificandoId !== null}>
+                {justificandoId !== null ? "Guardando..." : "Confirmar justificación"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
