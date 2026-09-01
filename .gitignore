@@ -10,3 +10,8 @@ supabase/.temp/
 backups/
 .backups-nube/
 tsconfig.tsbuildinfo
+
+# Android / Gradle build artifacts and local config
+mobile-app/.gradle/
+mobile-app/build/
+.vscode/

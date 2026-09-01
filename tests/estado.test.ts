@@ -1,5 +1,12 @@
 ﻿import { describe, it, expect } from "vitest";
-import { estadoClase, esPrimeraClase, aMinutos, normalizeName, esAlumnoRegistrado } from "@/lib/estado";
+import {
+  estadoClase,
+  esPrimeraClase,
+  aMinutos,
+  normalizeName,
+  esAlumnoRegistrado,
+  formatFechaPeru,
+} from "@/lib/estado";
 
 // estado.ts usa la hora real de Perú; para pruebas deterministas probamos
 // aMinutos y normalizeName (puras) y la lógica de estadoClase con inputs fijos
@@ -52,6 +59,14 @@ describe("esPrimeraClase", () => {
 
   it("devuelve false cuando no hay clases de ese día", () => {
     expect(esPrimeraClase(todas[0], todas, "Martes", excluidos)).toBe(false);
+  });
+});
+
+describe("formatFechaPeru", () => {
+  it("genera fechas ISO en horario de Perú para fechas de referencia", () => {
+    expect(formatFechaPeru(new Date("2026-08-31T23:30:00-05:00"))).toBe("2026-08-31");
+    expect(formatFechaPeru(new Date("2026-09-01T00:00:00-05:00"))).toBe("2026-09-01");
+    expect(formatFechaPeru(new Date("2026-09-01T00:30:00Z"))).toBe("2026-08-31");
   });
 });
 

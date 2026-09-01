@@ -1,44 +1,176 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="24dp">
+    android:background="#F3F7FB"
+    android:padding="16dp">
 
-    <TextView
-        android:id="@+id/txt_bienvenida"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Panel de Administración"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="24dp"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingBottom="96dp">
 
-    <TextView
-        android:id="@+id/txt_total_alumnos"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"/>
+        <TextView
+            android:id="@+id/txt_bienvenida"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Panel de Administración"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#163B6F"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp" />
 
-    <Button
-        android:id="@+id/btn_marcar_asistencia"
+        <TextView
+            android:id="@+id/txt_fecha_hoy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Hoy: 01/09/2026"
+            android:textSize="14sp"
+            android:textColor="#4B5563"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#FFFFFF"
+            android:padding="18dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Multas de hoy"
+                android:textStyle="bold"
+                android:textColor="#0F172A"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/txt_multas_hoy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="0 pendientes • Total S/ 0.00"
+                android:textColor="#DC2626"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txt_total_alumnos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Total de alumnos activos: 31"
+                android:textColor="#475569"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_marcar_asistencia"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ver reportes de asistencia"
+            android:backgroundTint="#1D4ED8"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btn_ver_multas"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ver multas del día"
+            android:backgroundTint="#F59E0B"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btn_cerrar_sesion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cerrar sesión"
+            android:backgroundTint="#475569"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Ver Reportes de Asistencia"/>
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="12dp">
 
-    <Button
-        android:id="@+id/btn_ver_multas"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Ver Multas Pendientes"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:layout_marginHorizontal="18dp"
+            android:layout_marginTop="28dp"
+            android:background="#FFFFFF"
+            android:elevation="5dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
-    <Button
-        android:id="@+id/btn_cerrar_sesion"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Cerrar Sesión"/>
+            <Button
+                android:id="@+id/btn_nav_inicio"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="🏠\nInicio"
+                android:textAllCaps="false"
+                android:textSize="11sp"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#334155" />
 
-</LinearLayout>
+            <Button
+                android:id="@+id/btn_nav_asistencia"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="📋\nAsis."
+                android:textAllCaps="false"
+                android:textSize="11sp"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#334155" />
+
+            <Space
+                android:layout_width="64dp"
+                android:layout_height="match_parent" />
+
+            <Button
+                android:id="@+id/btn_nav_multas"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="💸\nMultas"
+                android:textAllCaps="false"
+                android:textSize="11sp"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#334155" />
+
+            <Button
+                android:id="@+id/btn_nav_perfil"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="👤\nPerfil"
+                android:textAllCaps="false"
+                android:textSize="11sp"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#334155" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/fab_qr"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center_horizontal|top"
+            android:backgroundTint="#2563EB"
+            android:text="＋"
+            android:textSize="30sp"
+            android:textColor="#FFFFFF"
+            android:elevation="8dp" />
+    </FrameLayout>
+</RelativeLayout>

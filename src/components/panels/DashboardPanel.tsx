@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fechaHoy, formatFechaPeru } from "@/lib/estado";
 import {
   Bar,
   BarChart,
@@ -37,15 +38,22 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const query = esAlumno ? supabase.from("asistencia").select("*").eq("alumno", alumnoId) : supabase.from("asistencia").select("*");
-    const queryMultas = esAlumno ? supabase.from("multas").select("*").eq("alumno", alumnoId) : supabase.from("multas").select("*");
+    const fechaDesde = formatFechaPeru(new Date(Date.now() - 45 * 24 * 60 * 60 * 1000));
+
+    let query = supabase.from("asistencia").select("*").gte("fecha", fechaDesde);
+    let queryMultas = supabase.from("multas").select("*").gte("fecha", fechaDesde);
+
+    if (esAlumno) {
+      query = query.eq("alumno", alumnoId);
+      queryMultas = queryMultas.eq("alumno", alumnoId);
+    }
 
     Promise.all([query, queryMultas]).then(([{ data: asis }, { data: ms }]) => {
       const regs = (asis ?? []) as { fecha: string; curso: string; estado: string; justificada?: boolean }[];
       const filasMultas = (ms ?? []) as { estado: string; monto: number }[];
 
       // Estado hoy (solo Presente / Tardanza / Falta)
-      const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(new Date());
+      const hoy = fechaHoy();
       const hoyRegs = regs.filter((r) => r.fecha === hoy);
       const contar = (arr: typeof hoyRegs) =>
         ["Presente", "Tardanza", "Falta"]

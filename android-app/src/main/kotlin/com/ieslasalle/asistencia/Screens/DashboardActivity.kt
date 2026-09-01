@@ -10,6 +10,9 @@ import com.ieslasalle.asistencia.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class DashboardActivity : AppCompatActivity() {
 
@@ -19,6 +22,13 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var btnVerMultas: Button
     private lateinit var btnCerrarSesion: Button
     private lateinit var txtTotalAlumnos: TextView
+    private lateinit var txtFechaHoy: TextView
+    private lateinit var txtMultasHoy: TextView
+    private lateinit var btnNavInicio: Button
+    private lateinit var btnNavAsistencia: Button
+    private lateinit var btnNavMultas: Button
+    private lateinit var btnNavPerfil: Button
+    private lateinit var fabQr: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +40,13 @@ class DashboardActivity : AppCompatActivity() {
         btnVerMultas = findViewById(R.id.btn_ver_multas)
         btnCerrarSesion = findViewById(R.id.btn_cerrar_sesion)
         txtTotalAlumnos = findViewById(R.id.txt_total_alumnos)
+        txtFechaHoy = findViewById(R.id.txt_fecha_hoy)
+        txtMultasHoy = findViewById(R.id.txt_multas_hoy)
+        btnNavInicio = findViewById(R.id.btn_nav_inicio)
+        btnNavAsistencia = findViewById(R.id.btn_nav_asistencia)
+        btnNavMultas = findViewById(R.id.btn_nav_multas)
+        btnNavPerfil = findViewById(R.id.btn_nav_perfil)
+        fabQr = findViewById(R.id.fab_qr)
 
         authManager = AuthManager(this, com.supabase.supabase.kt.SupabaseClient.create(
             "https://wdusozavhsgqlwsyxmzb.supabase.co",
@@ -51,19 +68,25 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun configurarInterfaz() {
-        // Bienvenida al admin
-        txtBienvenida.text = "Panel de Administración - IES La Salle"
+        val fechaHoy = SimpleDateFormat("dd/MM/yyyy", Locale("es", "PE")).format(Date())
 
-        // Configurar listeners
+        txtBienvenida.text = "Panel de Administración"
+        txtFechaHoy.text = "Hoy: $fechaHoy"
+        txtMultasHoy.text = "Multas del día: 0 pendientes • Total S/ 0.00"
+
         btnMarcarAsistencia.setOnClickListener {
-            // Admin puede ver todos los marcaciones
-            Toast.makeText(this, "Acceso a reportes de asistencia", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Reportes de asistencia", Toast.LENGTH_SHORT).show()
         }
 
         btnVerMultas.setOnClickListener {
-            // Ir a reporte de multas
-            Toast.makeText(this, "Ver multas pendientes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Mostrando multas del día", Toast.LENGTH_SHORT).show()
         }
+
+        btnNavInicio.setOnClickListener { Toast.makeText(this, "Inicio", Toast.LENGTH_SHORT).show() }
+        btnNavAsistencia.setOnClickListener { Toast.makeText(this, "Asistencia", Toast.LENGTH_SHORT).show() }
+        btnNavMultas.setOnClickListener { Toast.makeText(this, "Multas", Toast.LENGTH_SHORT).show() }
+        btnNavPerfil.setOnClickListener { Toast.makeText(this, "Perfil", Toast.LENGTH_SHORT).show() }
+        fabQr.setOnClickListener { Toast.makeText(this, "Escanear QR", Toast.LENGTH_SHORT).show() }
 
         btnCerrarSesion.setOnClickListener {
             cerrarSesion()

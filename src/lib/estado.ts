@@ -1,7 +1,22 @@
 const DIAS_ES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const DIAS_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+export function formatFechaPeru(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  return `${year}-${month}-${day}`;
+}
+
 function peruParts() {
+  const date = new Date();
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Lima",
     year: "numeric",
@@ -12,7 +27,7 @@ function peruParts() {
     second: "2-digit",
     weekday: "long",
     hour12: false,
-  }).formatToParts(new Date());
+  }).formatToParts(date);
 
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   let hh = get("hour");
@@ -54,8 +69,7 @@ export function esAlumnoRegistrado(id: string): boolean {
 }
 
 export function fechaHoy(): string {
-  const p = peruParts();
-  return `${p.y}-${p.m}-${p.d}`;
+  return formatFechaPeru(new Date());
 }
 
 export function diaHoy(): string {
