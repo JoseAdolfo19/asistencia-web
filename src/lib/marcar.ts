@@ -304,103 +304,63 @@ export async function ejecutarCierreClases(): Promise<CierreResult> {
   // Config, cursos y horario vienen de la cache del día; lo mutable se lee fresco.
   const base = await cargarBaseDia();
 
-  const [abiertasRes, asisRes, alumnosRes] = await Promise.all([
-    supabaseAdmin.from("clases_abiertas").select("curso,hora_abierta").eq("fecha", hoyStr),
-    supabaseAdmin.from("asistencia").select("id,alumno,curso,estado,justificada").eq("fecha", hoyStr),
+  // Modelo POR DÍA: un estado por alumno por jornada.
+  //   - Presente: QR de asistencia (08:00-08:30)
+  //   - Tardanza: QR de tardanza (09:00-10:00), genera 1 multa
+  //   - Falta: no escaneó ningún QR del día (sin multa)
+  const [asisRes, alumnosRes] = await Promise.all([
+    supabaseAdmin.from("asistencia").select("alumno,estado,curso").eq("fecha", hoyStr),
     supabaseAdmin.from("alumnos").select("id").in("rol", ["Alumno", "Tesorera"]),
   ]);
-  const abiertas = abiertasRes.data;
   const asisHoy = asisRes.data;
   const alumnos = alumnosRes.data;
-  const montoTardanza = base.montoTardanza;
 
-  const aperturaPorCurso = new Map<string, string>();
-  for (const a of abiertas ?? []) aperturaPorCurso.set(normalizeName(a.curso), a.hora_abierta);
-
-  // Registros de hoy: quiénes llegaron (Presente/Tardanza) y quiénes marcaron cada curso
-  const llegaronHoy = new Set<string>();
-  const marcaronCurso = new Map<string, Set<string>>();
-  for (const a of asisHoy ?? []) {
-    if (a.estado !== "Falta") llegaronHoy.add(a.alumno);
-    const k = normalizeName(a.curso);
-    if (!marcaronCurso.has(k)) marcaronCurso.set(k, new Set());
-    marcaronCurso.get(k)!.add(a.alumno);
-  }
-
-  // Cierra y penaliza solo los cursos obligatorios: los opcionales (Taller)
-  // tienen QR pero el cierre automático no genera Falta/Tardanza ni multas.
-  const clasesHoy = (base.lista as ClaseCierre[]).filter(
+  // Clases obligatorias de hoy (los opcionales, p.ej. Taller, no se cierran).
+  const clasesOblig = (base.lista as ClaseCierre[]).filter(
     (h) => !base.opcionales.has(normalizeName(h.curso))
   );
+  // Primera clase obligatoria del día (referencia de la marca del día).
+  const primera = primeraClaseObligatoria(base.lista, base.opcionales);
+  // Fin de jornada = hora de fin de la última clase obligatoria.
+  const finJornada = clasesOblig.reduce((max, c) => Math.max(max, aMinutos(c.hora_fin)), 0);
 
   const alumnosIds = (alumnos ?? []).map((a) => a.id).filter(esAlumnoRegistrado);
 
+  // Quienes ya marcaron hoy (Presente o Tardanza) no deben recibir Falta.
+  const marcaronHoy = new Set(
+    (asisHoy ?? []).filter((a) => a.estado !== "Falta").map((a) => a.alumno)
+  );
+
   const clasesCerradas: string[] = [];
-  let tardanzas = 0;
+  const tardanzas = 0;
   let faltas = 0;
   const errores: string[] = [];
 
-  const plan = planificarCierre(clasesHoy, alumnosIds, marcaronCurso, llegaronHoy, ahoraMin);
+  const plan = planificarCierre(primera, finJornada, alumnosIds, marcaronHoy, ahoraMin);
 
-  // Inserta por clase en lotes (2 consultas por clase en vez de 2 por alumno).
-  for (const p of plan) {
-    if (p.registros.length === 0) {
-      clasesCerradas.push(p.curso + " (sin pendientes)");
-      continue;
-    }
-
-    const filasAsis = p.registros.map((r) => ({
-      alumno: r.alumnoId,
-      curso: p.curso,
-      fecha: hoyStr,
-      hora: ahora,
-      estado: r.estado,
-    }));
-
-    const { data: insertadas, error: eAsis } = await supabaseAdmin
-      .from("asistencia")
-      .insert(filasAsis)
-      .select("id,alumno,curso,estado");
-    if (eAsis) {
-      errores.push(`Asistencia ${p.curso}: ${eAsis.message}`);
-      continue;
-    }
-
-    const filasMulta = (insertadas ?? [])
-      .filter((r) => r.estado === "Tardanza")
-      .map((r) => ({
-        alumno: r.alumno,
-        tipo: "Tardanza",
-        motivo: "No escaneó su QR en " + p.curso,
-        monto: montoTardanza,
-        fecha: hoyStr,
-        estado: "Pendiente",
-        asistencia_id: r.id,
-      }));
-
-    if (filasMulta.length > 0) {
-      const { error: eMulta } = await supabaseAdmin.from("multas").insert(filasMulta);
-      if (eMulta) errores.push(`Multa ${p.curso}: ${eMulta.message}`);
-    }
-
-    tardanzas += filasMulta.length;
-    faltas += filasAsis.length - filasMulta.length;
-    clasesCerradas.push(p.curso);
+  if (plan.registros.length === 0) {
+    if (primera) clasesCerradas.push("Jornada de hoy (sin faltas pendientes)");
+    return { ok: true, cerradas: clasesCerradas, tardanzas, faltas };
   }
 
-  // Quienes llegaron hoy (aunque sea a una clase posterior) no pueden quedar con Falta:
-  // sus Faltas de hoy se suben a Tardanza y se les genera la multa.
-  const faltasHoy = (asisHoy ?? []).filter((a) => a.estado === "Falta" && !a.justificada);
-  const procesados = new Set<string>();
-  for (const f of faltasHoy) {
-    if (!llegaronHoy.has(f.alumno)) continue;
-    if (procesados.has(f.alumno)) continue;
-    procesados.add(f.alumno);
-    const { errores: er, subidas } = await subirFaltasSiLlego(f.alumno, hoyStr, montoTardanza);
-    errores.push(...er);
-    tardanzas += subidas;
-    faltas = Math.max(0, faltas - subidas);
+  const filasAsis = plan.registros.map((r) => ({
+    alumno: r.alumnoId,
+    curso: plan.curso,
+    fecha: hoyStr,
+    hora: ahora,
+    estado: "Falta",
+  }));
+
+  const { error: eAsis } = await supabaseAdmin.from("asistencia").insert(filasAsis);
+  if (eAsis) {
+    errores.push(`Asistencia ${plan.curso}: ${eAsis.message}`);
+  } else {
+    faltas += filasAsis.length;
+    clasesCerradas.push(plan.curso);
   }
+
+  // NOTA: las Faltas NO generan multa. Las Tardanzas (con su multa) se crean
+  // únicamente al escanear el QR de tardanza (09:00-10:00) en marcarPorDia.
 
   if (errores.length > 0) {
     return { ok: false, cerradas: clasesCerradas, tardanzas, faltas, error: "Algunos registros fallaron: " + errores.join(" | ") };

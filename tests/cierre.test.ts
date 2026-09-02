@@ -1,78 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { planificarCierre, planificarSubirFaltas } from "@/lib/cierre";
 
-describe("planificarCierre", () => {
-  const clasesHoy = [
-    { curso: "Matemáticas", hora_fin: "08:15" },
-    { curso: "Historia", hora_fin: "09:15" },
-    { curso: "Inglés", hora_fin: "10:30" },
-  ];
+describe("planificarCierre (modelo por día)", () => {
   const alumnos = ["al1", "al2", "al3"];
 
-  it("marca Falta a quienes no llegaron ni marcaron en clases terminadas", () => {
-    const plan = planificarCierre(
-      clasesHoy,
-      alumnos,
-      new Map(),
-      new Set(),
-      aMin("08:30")
-    );
+  it("asigna 1 Falta por alumno sin marca cuando la jornada terminó", () => {
+    const plan = planificarCierre("Matemáticas", 660, alumnos, new Set(), 700);
 
-    // Solo Matemáticas (fin 08:15) terminó; Historia e Inglés aún no.
-    expect(plan).toHaveLength(1);
-    expect(plan[0].curso).toBe("Matemáticas");
-    expect(plan[0].registros).toHaveLength(3);
-    expect(plan[0].registros.every((r) => r.estado === "Falta")).toBe(true);
+    expect(plan.curso).toBe("Matemáticas");
+    expect(plan.registros).toHaveLength(3);
+    expect(plan.registros.every((r) => r.estado === "Falta")).toBe(true);
   });
 
-  it("marca Tardanza a quien llegó a otra clase del día", () => {
-    const plan = planificarCierre(
-      clasesHoy,
-      alumnos,
-      new Map(),
-      new Set(["al2"]),
-      aMin("08:30")
-    );
+  it("no asigna Falta a quien ya marcó (Presente o Tardanza)", () => {
+    const plan = planificarCierre("Matemáticas", 660, alumnos, new Set(["al2"]), 700);
 
-    const registros = plan[0].registros;
-    expect(registros.find((r) => r.alumnoId === "al2")?.estado).toBe("Tardanza");
-    expect(registros.find((r) => r.alumnoId === "al1")?.estado).toBe("Falta");
+    expect(plan.registros).toHaveLength(2);
+    expect(plan.registros.some((r) => r.alumnoId === "al2")).toBe(false);
   });
 
-  it("excluye a quienes ya marcaron en ese curso", () => {
-    const marcaron = new Map<string, Set<string>>([
-      ["matematicas", new Set(["al1"])],
-    ]);
-    const plan = planificarCierre(
-      clasesHoy,
-      alumnos,
-      marcaron,
-      new Set(),
-      aMin("08:30")
-    );
-
-    expect(plan[0].registros).toHaveLength(2);
-    expect(plan[0].registros.some((r) => r.alumnoId === "al1")).toBe(false);
+  it("no actúa si la jornada aún no termina", () => {
+    const plan = planificarCierre("Matemáticas", 660, alumnos, new Set(), 500);
+    expect(plan.registros).toHaveLength(0);
   });
 
-  it("no cierra clases cuyo horario aún no termina", () => {
-    const plan = planificarCierre(clasesHoy, alumnos, new Map(), new Set(), aMin("08:00"));
-    expect(plan).toHaveLength(0);
-  });
-
-  it("incluye clases terminadas sin pendientes con registros vacíos", () => {
-    const marcaron = new Map<string, Set<string>>([
-      ["matematicas", new Set(alumnos)],
-    ]);
-    const plan = planificarCierre(
-      clasesHoy,
-      alumnos,
-      marcaron,
-      new Set(alumnos),
-      aMin("09:00")
-    );
-    expect(plan.length).toBeGreaterThanOrEqual(1);
-    expect(plan[0].registros).toHaveLength(0);
+  it("devuelve plan vacío si no hay primera clase", () => {
+    const plan = planificarCierre(null, 660, alumnos, new Set(), 700);
+    expect(plan.registros).toHaveLength(0);
   });
 });
 
@@ -127,8 +81,3 @@ describe("planificarSubirFaltas", () => {
     expect(plan.multasNuevas).toHaveLength(0);
   });
 });
-
-function aMin(h: string): number {
-  const [hh, mm] = h.split(":").map(Number);
-  return hh * 60 + mm;
-}

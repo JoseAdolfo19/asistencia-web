@@ -1,45 +1,43 @@
-import { normalizeName, aMinutos } from "@/lib/estado";
-
 export type ClaseCierre = {
   curso: string;
   hora_fin: string;
 };
 
+// Modelo por día: un alumno tiene UN estado por jornada.
+//  - Presente: escaneó el QR de asistencia (08:00-08:30)
+//  - Tardanza: escaneó el QR de tardanza (09:00-10:00)
+//  - Falta: no escaneó ningún QR del día
+// Máximo 1 tardanza (y 1 multa) por alumno por día.
 export type PlanCierre = {
-  curso: string;
-  registros: { alumnoId: string; estado: "Tardanza" | "Falta" }[];
+  curso: string; // primera clase obligatoria del día (referencia de la marca)
+  registros: { alumnoId: string; estado: "Falta" }[];
 };
 
-// Planifica qué alumnos quedan como Tardanza o Falta al cerrar las clases
-// cuyo horario ya terminó, excluyendo quienes ya marcaron en ese curso.
-// Incluye también las clases terminadas sin pendientes (registros vacíos).
+// Planifica la Falta del día. Solo actúa cuando TODAS las clases obligatorias de
+// la jornada terminaron; para cada alumno sin marca de día (ni Presente ni
+// Tardanza) se asigna una única Falta. No genera multas (la Falta no lleva multa).
 export function planificarCierre(
-  clasesHoy: ClaseCierre[],
+  cursoPrimera: string | null,
+  finJornada: number,
   alumnosIds: string[],
-  marcaronCurso: Map<string, Set<string>>,
-  llegaronHoy: Set<string>,
+  marcaronHoy: Set<string>,
   ahoraMin: number
-): PlanCierre[] {
-  const plan: PlanCierre[] = [];
+): PlanCierre {
+  if (!cursoPrimera) return { curso: "", registros: [] };
+  if (ahoraMin < finJornada) return { curso: "", registros: [] };
 
-  for (const h of clasesHoy) {
-    const fin = aMinutos(h.hora_fin);
-    if (ahoraMin < fin) continue;
+  const registros = alumnosIds
+    .filter((id) => !marcaronHoy.has(id))
+    .map((alumnoId) => ({ alumnoId, estado: "Falta" as const }));
 
-    const marcaron = marcaronCurso.get(normalizeName(h.curso)) ?? new Set<string>();
-    const registros: { alumnoId: string; estado: "Tardanza" | "Falta" }[] = [];
-
-    for (const id of alumnosIds) {
-      if (marcaron.has(id)) continue;
-      registros.push({ alumnoId: id, estado: llegaronHoy.has(id) ? "Tardanza" : "Falta" });
-    }
-
-    plan.push({ curso: h.curso, registros });
-  }
-
-  return plan;
+  return { curso: cursoPrimera, registros };
 }
 
+// ---------------------------------------------------------------------------
+// Funciones legacy de subida de Faltas a Tardanza por curso.
+// Se mantienen por compatibilidad con el marcado por curso (QR de clase), pero
+// el cierre automático ya NO las usa (el modelo es por día).
+// ---------------------------------------------------------------------------
 export type FaltaPendiente = { id: number; alumno: string; curso: string };
 export type MultaExistente = { motivo: string | null; asistencia_id: number | null };
 
@@ -48,9 +46,6 @@ export type PlanSubirFaltas = {
   multasNuevas: { alumno: string; curso: string; motivo: string; asistenciaId: number }[];
 };
 
-// Para un alumno que sí llegó hoy, sube a Tardanza sus Faltas del día y
-// decide qué multas de tardanza crear (evitando duplicados por curso o por
-// asistencia ya vinculada a una multa).
 export function planificarSubirFaltas(
   faltas: FaltaPendiente[],
   multas: MultaExistente[],
