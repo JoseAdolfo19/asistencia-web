@@ -8,6 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import Paginacion from "@/components/ui/Paginacion";
 
 type Multa = {
   id: number;
@@ -371,7 +372,9 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
           ))}
         </div>
       ) : (
-        <>
+        <Paginacion items={rows} pageSize={15}>
+          {(paginated) => (
+            <>
           {/* Tabla (desde sm) */}
           <div className="mt-4 hidden overflow-x-auto rounded-xl bg-white shadow sm:block">
             <table className="w-full text-sm">
@@ -390,7 +393,7 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                 </tr>
               </thead>
               <tbody>
-                {rows.map((m) => (
+                {paginated.map((m) => (
                   <tr key={m.id} className="border-t border-slate-100">
                     {!esAlumno && (
                       <td className="px-4 py-2 text-slate-700">{alumnosMap.get(m.alumno) ?? m.alumno}</td>
@@ -433,7 +436,7 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
 
           {/* Cards (móvil) */}
           <ul className="mt-4 space-y-2 sm:hidden">
-            {rows.map((m) => (
+            {paginated.map((m) => (
               <li key={m.id} className="rounded-xl bg-white p-3 shadow">
                 {!esAlumno && <p className="font-medium text-slate-800">{alumnosMap.get(m.alumno) ?? m.alumno}</p>}
                 <div className="mt-1 flex items-center justify-between text-sm">
@@ -464,7 +467,9 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
               </li>
             )}
           </ul>
-        </>
+            </>
+          )}
+        </Paginacion>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import PasswordStrength from "@/components/ui/PasswordStrength";
+import Paginacion from "@/components/ui/Paginacion";
 
 type Usuario = {
   id: string;
@@ -142,7 +143,9 @@ export default function UsuariosPanel() {
           ))}
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl bg-white shadow">
+        <Paginacion items={visibles} pageSize={15}>
+          {(paginated) => (
+            <div className="mt-4 overflow-x-auto rounded-xl bg-white shadow">
           <table className="w-full text-sm">
             <caption className="sr-only">Usuarios del sistema</caption>
             <thead className="bg-slate-50 text-left text-slate-500">
@@ -157,7 +160,7 @@ export default function UsuariosPanel() {
               </tr>
             </thead>
             <tbody>
-              {visibles.map((u) => (
+              {paginated.map((u) => (
                 <tr key={u.id} className="border-t border-slate-100">
                   <td className="px-4 py-2 font-medium text-slate-800">{u.id}</td>
                   <td className="px-4 py-2 text-slate-700">{u.nombres} {u.apellidos}</td>
@@ -190,7 +193,9 @@ export default function UsuariosPanel() {
               )}
             </tbody>
           </table>
-        </div>
+            </div>
+          )}
+        </Paginacion>
       )}
 
       {editando && (

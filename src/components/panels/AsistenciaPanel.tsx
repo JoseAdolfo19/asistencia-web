@@ -8,6 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import Paginacion from "@/components/ui/Paginacion";
 
 type AsistenciaRow = {
   id: number;
@@ -343,7 +344,9 @@ export default function AsistenciaPanel({
           ))}
         </div>
       ) : (
-        <>
+        <Paginacion items={rowsFiltradas} pageSize={15}>
+          {(paginated) => (
+            <>
           {/* Tabla (desde sm) */}
           <div className="mt-4 hidden overflow-x-auto rounded-xl bg-white shadow sm:block">
             <table className="w-full text-sm">
@@ -361,7 +364,7 @@ export default function AsistenciaPanel({
                 </tr>
               </thead>
               <tbody>
-                {rowsFiltradas.map((a) => (
+                {paginated.map((a) => (
                   <tr key={a.id} className="border-t border-slate-100">
                     {isAdmin && (
                       <td className="px-4 py-2 text-slate-700">{alumnosMap.get(a.alumno) ?? a.alumno}</td>
@@ -410,7 +413,7 @@ export default function AsistenciaPanel({
 
           {/* Cards (móvil) */}
           <ul className="mt-4 space-y-2 sm:hidden">
-            {rowsFiltradas.map((a) => (
+            {paginated.map((a) => (
               <li key={a.id} className="rounded-xl bg-white p-3 shadow">
                 {isAdmin && <p className="font-medium text-slate-800">{alumnosMap.get(a.alumno) ?? a.alumno}</p>}
                 <div className="mt-1 flex items-center justify-between text-sm">
@@ -444,7 +447,9 @@ export default function AsistenciaPanel({
               </li>
             )}
           </ul>
-        </>
+            </>
+          )}
+        </Paginacion>
       )}
 
       {justificarRow && (

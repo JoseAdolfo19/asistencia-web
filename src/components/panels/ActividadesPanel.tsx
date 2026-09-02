@@ -8,6 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import Paginacion from "@/components/ui/Paginacion";
 
 type Actividad = {
   id: number;
@@ -223,8 +224,10 @@ export default function ActividadesPanel({
       ) : actividades.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">No hay actividades registradas.</p>
       ) : (
-        <div className="mt-4 space-y-3">
-          {actividades.map((act) => {
+        <Paginacion items={actividades} pageSize={15}>
+          {(paginated) => (
+            <div className="mt-4 space-y-3">
+              {paginated.map((act) => {
             const { total, participaron } = contar(act);
             const miEstado = participacion[act.id]?.[alumnoId];
             return (
@@ -305,7 +308,9 @@ export default function ActividadesPanel({
               </div>
             );
           })}
-        </div>
+            </div>
+          )}
+        </Paginacion>
       )}
     </div>
   );
