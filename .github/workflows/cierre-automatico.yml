@@ -1,0 +1,22 @@
+name: Cierre automático de clases y multas
+
+on:
+  schedule:
+    # Se ejecuta cada 30 minutos de lunes a viernes (12:00-22:00 UTC = 07:00-17:00 Perú).
+    # Genera Faltas/Tardanzas y sus multas aunque ningún docente tenga abierta la
+    # pantalla de escaneo. Ajusta el rango según tu horario lectivo.
+    - cron: "*/30 12-22 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  cerrar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar cierre de clases
+        run: |
+          code=$(curl -s -o /tmp/cierre.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://ieslasalle-web.vercel.app/api/cron/cerrar)
+          echo "HTTP $code"
+          cat /tmp/cierre.json
+          if [ "$code" != "200" ]; then exit 1; fi

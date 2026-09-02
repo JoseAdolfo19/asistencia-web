@@ -284,6 +284,14 @@ export async function cerrarClasesPendientes(): Promise<CierreResult> {
   const session = await getSession();
   if (!session) return { ok: false, cerradas: [], tardanzas: 0, faltas: 0, error: "Sesión expirada" };
 
+  return ejecutarCierreClases();
+}
+
+// Ejecuta el cierre automático de clases y generación de Faltas/Tardanzas/multas
+// sin depender de una sesión de navegador. La usa la ruta API /api/cron/cerrar
+// (disparada por un cron server-side) para que las multas se generen aunque nadie
+// tenga abierta la pantalla de escaneo.
+export async function ejecutarCierreClases(): Promise<CierreResult> {
   if (Date.now() - ultimoCierreCompleto < INTERVALO_CIERRE_MS) {
     return { ok: true, cerradas: [], tardanzas: 0, faltas: 0 };
   }
