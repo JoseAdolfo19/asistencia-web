@@ -44,7 +44,11 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
       let query = supabase.from("multas").select("*");
       if (esAlumno) query = query.eq("alumno", alumnoId);
       if (!esAlumno && alumno) query = query.eq("alumno", alumno);
-      if (estado) query = query.eq("estado", estado);
+      if (estado) {
+        query = query.eq("estado", estado);
+      } else {
+        query = query.neq("estado", "Anulada");
+      }
       if (tipo) query = query.eq("tipo", tipo);
       if (fecha) query = query.eq("fecha", fecha);
 
@@ -305,7 +309,7 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
             onChange={(e) => setFiltroEstado(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
           >
-            <option value="">Todos los estados</option>
+            <option value="">Pendientes y pagadas</option>
             <option value="Pendiente">Pendiente</option>
             <option value="Pagado">Pagado</option>
             <option value="Anulada">Anulada</option>
