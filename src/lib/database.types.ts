@@ -58,6 +58,7 @@ export type Database = {
           fecha: string
           id: number
           nombre: string
+          tipo: "Actividad" | "Limpieza"
         }
         Insert: {
           creado_en?: string
@@ -66,6 +67,7 @@ export type Database = {
           fecha: string
           id?: number
           nombre: string
+          tipo?: "Actividad" | "Limpieza"
         }
         Update: {
           creado_en?: string
@@ -74,6 +76,7 @@ export type Database = {
           fecha?: string
           id?: number
           nombre?: string
+          tipo?: "Actividad" | "Limpieza"
         }
         Relationships: []
       },
@@ -226,6 +229,7 @@ export type Database = {
           id: number
           multa_actividad: number
           multa_buzo: number
+          multa_limpieza: number
           multa_tardanza: number
           tiempo_apertura_qr: number
           tiempo_cierre_qr: number
@@ -234,6 +238,7 @@ export type Database = {
           id?: number
           multa_actividad?: number
           multa_buzo?: number
+          multa_limpieza?: number
           multa_tardanza?: number
           tiempo_apertura_qr?: number
           tiempo_cierre_qr?: number
@@ -242,6 +247,7 @@ export type Database = {
           id?: number
           multa_actividad?: number
           multa_buzo?: number
+          multa_limpieza?: number
           multa_tardanza?: number
           tiempo_apertura_qr?: number
           tiempo_cierre_qr?: number

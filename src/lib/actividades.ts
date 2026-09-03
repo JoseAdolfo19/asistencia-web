@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { esAlumnoRegistrado } from "@/lib/estado";
 
 export type ActividadResult = { ok: boolean; error?: string; multasCreadas?: number };
+export type TipoActividad = "Actividad" | "Limpieza";
 
 function puedeGestionar(rol: string): boolean {
   return rol === "Tesorera" || rol === "Administrador";
@@ -15,7 +16,9 @@ function puedeGestionar(rol: string): boolean {
 export async function crearActividad(
   nombre: string,
   fecha: string,
-  descripcion: string
+  descripcion: string,
+  tipo: TipoActividad = "Actividad",
+  alumnosAsignados?: string[]
 ): Promise<ActividadResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sesión expirada" };
@@ -27,7 +30,7 @@ export async function crearActividad(
 
   const { data: act, error: errAct } = await supabaseAdmin
     .from("actividades")
-    .insert({ nombre: n, descripcion: String(descripcion || "").trim() || null, fecha, estado: "Abierta" })
+    .insert({ nombre: n, descripcion: String(descripcion || "").trim() || null, fecha, estado: "Abierta", tipo })
     .select("id")
     .single();
   if (errAct || !act) return { ok: false, error: "No se pudo crear la actividad: " + errAct?.message };
@@ -37,9 +40,11 @@ export async function crearActividad(
     .from("alumnos")
     .select("id")
     .in("rol", ["Alumno", "Tesorera"]);
+  const idsAsignados = tipo === "Limpieza" ? new Set(alumnosAsignados ?? []) : null;
   const filas = (alumnos ?? [])
     .map((a) => a.id)
     .filter(esAlumnoRegistrado)
+    .filter((id) => !idsAsignados || idsAsignados.has(id))
     .map((id) => ({ actividad_id: act.id, alumno: id, participacion: false }));
   if (filas.length > 0) {
     const { error: errAl } = await supabaseAdmin.from("actividad_alumnos").insert(filas);
@@ -77,7 +82,7 @@ export async function cerrarActividad(actividadId: number): Promise<ActividadRes
 
   const { data: act, error: errAct } = await supabaseAdmin
     .from("actividades")
-    .select("id,nombre,fecha,estado")
+    .select("id,nombre,fecha,estado,tipo")
     .eq("id", actividadId)
     .limit(1);
   if (errAct || !act || act.length === 0) return { ok: false, error: "Actividad no encontrada" };
@@ -85,7 +90,7 @@ export async function cerrarActividad(actividadId: number): Promise<ActividadRes
   if (a.estado !== "Abierta") return { ok: false, error: "La actividad ya está cerrada o anulada" };
 
   const { data: cfg } = await supabaseAdmin.from("configuracion").select("*").limit(1);
-  const monto = Number(cfg?.[0]?.multa_actividad) || 50;
+  const monto = a.tipo === "Limpieza" ? Number(cfg?.[0]?.multa_limpieza) || 5 : Number(cfg?.[0]?.multa_actividad) || 50;
 
   const { data: partes } = await supabaseAdmin
     .from("actividad_alumnos")
