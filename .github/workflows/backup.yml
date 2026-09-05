@@ -20,7 +20,7 @@ jobs:
         run: npm ci
 
       - name: Ejecutar backup
-        run: node scripts/backup.js .backups-nube
+        run: node scripts/backup.js backups-nube
         env:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -29,6 +29,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backup-ieslasalle-${{ github.run_number }}
-          path: .backups-nube
+          path: backups-nube
           retention-days: 90
           if-no-files-found: error
