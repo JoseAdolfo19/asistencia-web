@@ -8,7 +8,6 @@ out/
 supabase/.temp/
 
 backups/
-.backups-nube/
 tsconfig.tsbuildinfo
 
 # Android / Gradle build artifacts and local config
