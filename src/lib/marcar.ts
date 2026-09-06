@@ -326,17 +326,18 @@ export async function ejecutarCierreClases(): Promise<CierreResult> {
 
   const alumnosIds = (alumnos ?? []).map((a) => a.id).filter(esAlumnoRegistrado);
 
-  // Quienes ya marcaron hoy (Presente o Tardanza) no deben recibir Falta.
-  const marcaronHoy = new Set(
-    (asisHoy ?? []).filter((a) => a.estado !== "Falta").map((a) => a.alumno)
-  );
+  // El modelo es UN estado por alumno por jornada. Quien ya tiene CUALQUIER
+  // registro de asistencia hoy (Presente, Tardanza o incluso una Falta de un
+  // cierre anterior) no debe recibir otra Falta. Esto hace el cierre idempotente
+  // y evita duplicar faltas cuando el cron se ejecuta varias veces al día.
+  const yaRegistrados = new Set((asisHoy ?? []).map((a) => a.alumno));
 
   const clasesCerradas: string[] = [];
   const tardanzas = 0;
   let faltas = 0;
   const errores: string[] = [];
 
-  const plan = planificarCierre(primera, finJornada, alumnosIds, marcaronHoy, ahoraMin);
+  const plan = planificarCierre(primera, finJornada, alumnosIds, yaRegistrados, ahoraMin);
 
   if (plan.registros.length === 0) {
     if (primera) clasesCerradas.push("Jornada de hoy (sin faltas pendientes)");
