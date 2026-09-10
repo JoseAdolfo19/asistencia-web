@@ -51,7 +51,7 @@ export default function AsistenciaPanel({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [justificandoId, setJustificandoId] = useState<number | null>(null);
   const [justificarRow, setJustificarRow] = useState<AsistenciaRow | null>(null);
-  const [tipoJustificacion, setTipoJustificacion] = useState<"Tardanza" | "Falta">("Falta");
+  const [tipoJustificacion, setTipoJustificacion] = useState<"Presente" | "Tardanza" | "Falta">("Falta");
   const [motivoJustificacion, setMotivoJustificacion] = useState("");
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
@@ -150,7 +150,9 @@ export default function AsistenciaPanel({
     } else {
       setMsg({
         ok: true,
-        text: `Registro justificado con ${tipoJustificacion === "Tardanza" ? "tardanza" : "falta"} y multa anulada (si existía).`,
+        text: `Registro justificado con ${
+          tipoJustificacion === "Presente" ? "presente" : tipoJustificacion === "Tardanza" ? "tardanza" : "falta"
+        } y multa anulada (si existía).`,
       });
       setJustificarRow(null);
       cargar(filtroCurso, filtroFecha, filtroAlumno);
@@ -473,9 +475,10 @@ export default function AsistenciaPanel({
               <select
                 id="tipo-justificacion"
                 value={tipoJustificacion}
-                onChange={(e) => setTipoJustificacion(e.target.value as "Tardanza" | "Falta")}
+                onChange={(e) => setTipoJustificacion(e.target.value as "Presente" | "Tardanza" | "Falta")}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               >
+                <option value="Presente">Justificado con presente</option>
                 <option value="Tardanza">Justificado con tardanza</option>
                 <option value="Falta">Justificado con falta</option>
               </select>

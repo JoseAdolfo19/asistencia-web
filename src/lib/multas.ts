@@ -106,16 +106,28 @@ export async function justificarAsistencia(
   if (errUpdate) return { ok: false, error: "No se pudo justificar: " + errUpdate.message };
 
   // Anula la multa pendiente asociada a este registro de tardanza
-  // (usando la conexión asistencia_id cuando existe; fallback por alumno+fecha).
-  const q = supabaseAdmin
-    .from("multas")
-    .update({ estado: "Anulada", motivo: "Anulada por justificación: " + texto })
-    .eq("estado", "Pendiente");
+  // SOLAMENTE si el estado final es "Presente". Si se justifica como "Tardanza", la multa se mantiene.
+  if (estado === "Presente") {
+    const q = supabaseAdmin
+      .from("multas")
+      .update({ estado: "Anulada", motivo: "Anulada por justificación: " + texto })
+      .eq("estado", "Pendiente");
 
-  let errMulta: { message: string } | null = null;
-  try {
-    const viaId = await q.eq("asistencia_id", id);
-    if (viaId.error && String(viaId.error.message).toLowerCase().includes("column")) {
+    let errMulta: { message: string } | null = null;
+    try {
+      const viaId = await q.eq("asistencia_id", id);
+      if (viaId.error && String(viaId.error.message).toLowerCase().includes("column")) {
+        const { error: errFallback } = await supabaseAdmin
+          .from("multas")
+          .update({ estado: "Anulada", motivo: "Anulada por justificación: " + texto })
+          .eq("alumno", reg.alumno)
+          .eq("fecha", reg.fecha)
+          .eq("estado", "Pendiente");
+        errMulta = errFallback;
+      } else {
+        errMulta = viaId.error;
+      }
+    } catch {
       const { error: errFallback } = await supabaseAdmin
         .from("multas")
         .update({ estado: "Anulada", motivo: "Anulada por justificación: " + texto })
@@ -123,19 +135,9 @@ export async function justificarAsistencia(
         .eq("fecha", reg.fecha)
         .eq("estado", "Pendiente");
       errMulta = errFallback;
-    } else {
-      errMulta = viaId.error;
     }
-  } catch {
-    const { error: errFallback } = await supabaseAdmin
-      .from("multas")
-      .update({ estado: "Anulada", motivo: "Anulada por justificación: " + texto })
-      .eq("alumno", reg.alumno)
-      .eq("fecha", reg.fecha)
-      .eq("estado", "Pendiente");
-    errMulta = errFallback;
+    if (errMulta) return { ok: false, error: "Registro justificado pero no se pudo anular la multa: " + errMulta.message };
   }
-  if (errMulta) return { ok: false, error: "Registro justificado pero no se pudo anular la multa: " + errMulta.message };
 
   await registrarAuditoria(
     "justificar_asistencia",
