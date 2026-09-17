@@ -12,12 +12,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const providedSecret = searchParams.get("secret");
 
-  // Usamos ADMIN_SECRET del env o un secreto temporal para esta operación
-  const secret = process.env.ADMIN_SECRET || "temp-admin-secret-2026";
+  // Usamos ADMIN_SECRET del env para seguridad
+  const secret = process.env.ADMIN_SECRET;
 
-  if (!providedSecret || providedSecret !== secret) {
+  if (!secret || !providedSecret || providedSecret !== secret) {
     return NextResponse.json(
-      { ok: false, error: "No autorizado. Se requiere un secreto válido." },
+      { ok: false, error: "No autorizado. Se requiere un secreto válido configurado en el servidor." },
       { status: 401 }
     );
   }
