@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { cambiarEstadoMulta, crearMultaBuzo } from "@/lib/multas";
+import { cambiarEstadoMulta, crearMultaBuzo, justificarMulta } from "@/lib/multas";
 import { exportarExcel } from "@/lib/exportar";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -112,6 +112,23 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
       setMsg({ ok: false, text: res.error || "Error" });
     } else {
       setMsg({ ok: true, text: `Multa de ${m.tipo} cobrada (S/ ${Number(m.monto).toFixed(2)}).` });
+      cargar(filtroEstado, filtroTipo, filtroFecha, filtroAlumno);
+    }
+  }
+
+  async function justificar(m: Multa) {
+    if (m.estado === "Pagado" || m.estado === "Anulada") return;
+    const motivo = window.prompt("Motivo de la justificación:");
+    if (!motivo) return;
+
+    setLoading(true);
+    setMsg(null);
+    const res = await justificarMulta(m.id, motivo);
+    setLoading(false);
+    if (!res.ok) {
+      setMsg({ ok: false, text: res.error || "Error" });
+    } else {
+      setMsg({ ok: true, text: `Multa de ${m.tipo} justificada y anulada.` });
       cargar(filtroEstado, filtroTipo, filtroFecha, filtroAlumno);
     }
   }
@@ -410,14 +427,24 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                         {m.estado === "Pagado" || m.estado === "Anulada" ? (
                           <span className="text-xs text-slate-400">—</span>
                         ) : (
-                          <Button
-                            variant="success"
-                            size="sm"
-                            onClick={() => cobrar(m)}
-                            disabled={cobrandoId !== null}
-                          >
-                            {cobrandoId === m.id ? "Cobrando..." : `Cobrar S/ ${Number(m.monto).toFixed(2)}`}
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="success"
+                              size="sm"
+                              onClick={() => cobrar(m)}
+                              disabled={cobrandoId !== null}
+                            >
+                              {cobrandoId === m.id ? "Cobrando..." : `Cobrar S/ ${Number(m.monto).toFixed(2)}`}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => justificar(m)}
+                              disabled={cobrandoId !== null}
+                            >
+                              Justificar
+                            </Button>
+                          </div>
                         )}
                       </td>
                     )}
@@ -449,14 +476,24 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                 <div className="mt-2 flex items-center justify-between">
                   <Badge variant={m.estado === "Pagado" ? "green" : m.estado === "Anulada" ? "slate" : "red"}>{m.estado}</Badge>
                   {puedeCobrar && m.estado !== "Pagado" && m.estado !== "Anulada" && (
-                    <Button
-                      variant="success"
-                      size="sm"
-                      onClick={() => cobrar(m)}
-                      disabled={cobrandoId !== null}
-                    >
-                      {cobrandoId === m.id ? "Cobrando..." : "Cobrar"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => justificar(m)}
+                        disabled={cobrandoId !== null}
+                      >
+                        Justificar
+                      </Button>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={() => cobrar(m)}
+                        disabled={cobrandoId !== null}
+                      >
+                        {cobrandoId === m.id ? "Cobrando..." : "Cobrar"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </li>

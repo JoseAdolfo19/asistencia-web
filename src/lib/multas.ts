@@ -60,7 +60,40 @@ export async function crearMultaBuzo(alumnoId: string): Promise<CrearMultaResult
   return { ok: true };
 }
 
-export type JustificarResult = { ok: boolean; error?: string };
+export type JustificarMultaResult = { ok: boolean; error?: string };
+
+export async function justificarMulta(id: number, motivo: string): Promise<JustificarMultaResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sesión expirada" };
+  if (!esTesorera(session.rol)) return { ok: false, error: "Solo la tesorera o el administrador pueden justificar multas" };
+
+  const texto = String(motivo || "").trim();
+  if (!texto) return { ok: false, error: "Escribe el motivo de la justificación" };
+
+  const { data: fila, error: errSelect } = await supabaseAdmin
+    .from("multas")
+    .select("id,monto,alumno")
+    .eq("id", id)
+    .limit(1);
+  if (errSelect || !fila || fila.length === 0) return { ok: false, error: "Multa no encontrada" };
+
+  const { error: errUpdate } = await supabaseAdmin
+    .from("multas")
+    .update({
+      estado: "Anulada",
+      motivo: "Justificada: " + texto
+    })
+    .eq("id", id);
+
+  if (errUpdate) return { ok: false, error: "No se pudo justificar la multa: " + errUpdate.message };
+
+  await registrarAuditoria(
+    "justificar_multa",
+    `${session.nombres} ${session.apellidos} justificó multa #${id} (S/ ${fila[0].monto}) de ${fila[0].alumno}: ${texto}`
+  );
+
+  return { ok: true };
+}
 
 export type EstadoJustificacion = "Presente" | "Tardanza" | "Falta";
 
