@@ -9,7 +9,7 @@ export type ActividadResult = { ok: boolean; error?: string; multasCreadas?: num
 export type TipoActividad = "Actividad" | "Limpieza";
 
 function puedeGestionar(rol: string): boolean {
-  return rol === "Tesorera" || rol === "Administrador";
+  return ["Tesorera", "Administrador", "Docente"].includes(rol);
 }
 
 // Crea una actividad y registra a todos los alumnos con participo=false.

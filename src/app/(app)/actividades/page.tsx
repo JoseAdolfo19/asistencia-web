@@ -8,7 +8,7 @@ export default async function ActividadesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const puedeGestionar = session.rol === "Tesorera" || session.rol === "Administrador";
+  const puedeGestionar = ["Tesorera", "Administrador", "Docente"].includes(session.rol);
   const esAlumno = session.rol === "Alumno";
 
   return (
