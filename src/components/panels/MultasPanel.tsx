@@ -20,7 +20,7 @@ type Multa = {
   estado: string;
 };
 
-export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puedeCobrar: boolean; esAlumno: boolean; alumnoId: string }) {
+export default function MultasPanel({ puedeCobrar, puedeJustificar, esAlumno, alumnoId }: { puedeCobrar: boolean; puedeJustificar: boolean; esAlumno: boolean; alumnoId: string }) {
   const [rows, setRows] = useState<Multa[]>([]);
   const [alumnosMap, setAlumnosMap] = useState<Map<string, string>>(new Map());
   const [alumnos, setAlumnos] = useState<{ id: string; nombre: string }[]>([]);
@@ -406,7 +406,7 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                   <th scope="col" className="px-4 py-2 font-medium">Motivo</th>
                   <th scope="col" className="px-4 py-2 font-medium">Monto</th>
                   <th scope="col" className="px-4 py-2 font-medium">Estado</th>
-                  {puedeCobrar && <th scope="col" className="px-4 py-2 font-medium">Acción</th>}
+                  {(puedeCobrar || puedeJustificar) && <th scope="col" className="px-4 py-2 font-medium">Acción</th>}
                 </tr>
               </thead>
               <tbody>
@@ -422,28 +422,32 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                     <td className="px-4 py-2">
                       <Badge variant={m.estado === "Pagado" ? "green" : m.estado === "Anulada" ? "slate" : "red"}>{m.estado}</Badge>
                     </td>
-                    {puedeCobrar && (
+                    {(puedeCobrar || puedeJustificar) && (
                       <td className="px-4 py-2">
                         {m.estado === "Pagado" || m.estado === "Anulada" ? (
                           <span className="text-xs text-slate-400">—</span>
                         ) : (
                           <div className="flex gap-2">
-                            <Button
-                              variant="success"
-                              size="sm"
-                              onClick={() => cobrar(m)}
-                              disabled={cobrandoId !== null}
-                            >
-                              {cobrandoId === m.id ? "Cobrando..." : `Cobrar S/ ${Number(m.monto).toFixed(2)}`}
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => justificar(m)}
-                              disabled={cobrandoId !== null}
-                            >
-                              Justificar
-                            </Button>
+                            {puedeCobrar && (
+                              <Button
+                                variant="success"
+                                size="sm"
+                                onClick={() => cobrar(m)}
+                                disabled={cobrandoId !== null}
+                              >
+                                {cobrandoId === m.id ? "Cobrando..." : `Cobrar S/ ${Number(m.monto).toFixed(2)}`}
+                              </Button>
+                            )}
+                            {puedeJustificar && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => justificar(m)}
+                                disabled={cobrandoId !== null}
+                              >
+                                Justificar
+                              </Button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -475,24 +479,28 @@ export default function MultasPanel({ puedeCobrar, esAlumno, alumnoId }: { puede
                 </div>
                 <div className="mt-2 flex items-center justify-between">
                   <Badge variant={m.estado === "Pagado" ? "green" : m.estado === "Anulada" ? "slate" : "red"}>{m.estado}</Badge>
-                  {puedeCobrar && m.estado !== "Pagado" && m.estado !== "Anulada" && (
+                  {(puedeCobrar || puedeJustificar) && m.estado !== "Pagado" && m.estado !== "Anulada" && (
                     <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => justificar(m)}
-                        disabled={cobrandoId !== null}
-                      >
-                        Justificar
-                      </Button>
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={() => cobrar(m)}
-                        disabled={cobrandoId !== null}
-                      >
-                        {cobrandoId === m.id ? "Cobrando..." : "Cobrar"}
-                      </Button>
+                      {puedeJustificar && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => justificar(m)}
+                          disabled={cobrandoId !== null}
+                        >
+                          Justificar
+                        </Button>
+                      )}
+                      {puedeCobrar && (
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={() => cobrar(m)}
+                          disabled={cobrandoId !== null}
+                        >
+                          {cobrandoId === m.id ? "Cobrando..." : "Cobrar"}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

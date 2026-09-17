@@ -11,10 +11,12 @@ export default async function MultasPage() {
 
   const esAlumno = session.rol === "Alumno";
   const puedeCobrar = session.rol === "Tesorera" || session.rol === "Administrador";
+  const puedeJustificar = ["Docente", "Tesorera", "Administrador"].includes(session.rol);
 
   return (
     <MultasPanel
       puedeCobrar={puedeCobrar}
+      puedeJustificar={puedeJustificar}
       esAlumno={esAlumno}
       alumnoId={session.id}
     />

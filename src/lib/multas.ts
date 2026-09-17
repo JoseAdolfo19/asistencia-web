@@ -65,7 +65,7 @@ export type JustificarMultaResult = { ok: boolean; error?: string };
 export async function justificarMulta(id: number, motivo: string): Promise<JustificarMultaResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sesión expirada" };
-  if (!esTesorera(session.rol)) return { ok: false, error: "Solo la tesorera o el administrador pueden justificar multas" };
+  if (!["Docente", "Tesorera", "Administrador"].includes(session.rol)) return { ok: false, error: "Solo los docentes, la tesorera o el administrador pueden justificar multas" };
 
   const texto = String(motivo || "").trim();
   if (!texto) return { ok: false, error: "Escribe el motivo de la justificación" };
