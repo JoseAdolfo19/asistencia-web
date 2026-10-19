@@ -126,7 +126,9 @@ export default function AsistenciaPanel({
   }, [cargar, filtroCurso, filtroFecha, filtroAlumno]);
 
   function abrirJustificar(row: AsistenciaRow) {
-    setTipoJustificacion(row.estado === "Tardanza" ? "Tardanza" : "Falta");
+    // Por defecto, justificar convierte el registro en Presente
+    // (el docente/administrador puede elegir otro resultado en el desplegable)
+    setTipoJustificacion("Presente");
     setMotivoJustificacion("");
     setErrorModal(null);
     setJustificarRow(row);

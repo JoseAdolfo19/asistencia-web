@@ -95,6 +95,7 @@ export async function justificarMulta(id: number, motivo: string): Promise<Justi
   return { ok: true };
 }
 
+export type JustificarResult = { ok: boolean; error?: string };
 export type EstadoJustificacion = "Presente" | "Tardanza" | "Falta";
 
 export async function justificarAsistencia(
