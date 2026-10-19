@@ -1,7 +1,4 @@
 @echo off
-REM Rota el log: conserva solo la ejecucion anterior
-if exist "C:\xampp\htdocs\ieslasalle-web\backups\backup.log" (
-  copy /y "C:\xampp\htdocs\ieslasalle-web\backups\backup.log" "C:\xampp\htdocs\ieslasalle-web\backups\backup.log.prev" > nul
-  del "C:\xampp\htdocs\ieslasalle-web\backups\backup.log"
-)
-"C:\Program Files\nodejs\node.exe" "C:\xampp\htdocs\ieslasalle-web\scripts\backup.js" > "C:\xampp\htdocs\ieslasalle-web\backups\backup.log" 2>&1
+REM Respaldo de Supabase con reintentos y omision de duplicados.
+REM Toda la logica vive en backup_inteligente.ps1; el log esta en backups\backup.log
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\xampp\htdocs\ieslasalle-web\scripts\backup_inteligente.ps1"

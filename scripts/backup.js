@@ -53,39 +53,49 @@ async function main() {
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   let total = 0;
 
-  for (const { tabla, orden } of TABLAS) {
-    let todos = [];
-    let desde = 0;
-    const page = 1000;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { data, error } = await supabase
-        .from(tabla)
-        .select("*")
-        .order(orden, { ascending: true })
-        .range(desde, desde + page - 1);
-      if (error) {
-        console.error(`Error en ${tabla}:`, error.message);
-        break;
+  try {
+    for (const { tabla, orden } of TABLAS) {
+      let todos = [];
+      let desde = 0;
+      const page = 1000;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from(tabla)
+          .select("*")
+          .order(orden, { ascending: true })
+          .range(desde, desde + page - 1);
+        if (error) throw new Error(`Error en ${tabla}: ${error.message}`);
+        if (!data || data.length === 0) break;
+        todos = todos.concat(data);
+        if (data.length < page) break;
+        desde += page;
       }
-      if (!data || data.length === 0) break;
-      todos = todos.concat(data);
-      if (data.length < page) break;
-      desde += page;
+      const archivo = path.join(carpeta, `${tabla}.json`);
+      fs.writeFileSync(archivo, JSON.stringify(todos, null, 2), "utf8");
+      total += todos.length;
+      console.log(`${tabla.padEnd(14)} ${todos.length} filas`);
     }
-    const archivo = path.join(carpeta, `${tabla}.json`);
-    fs.writeFileSync(archivo, JSON.stringify(todos, null, 2), "utf8");
-    total += todos.length;
-    console.log(`${tabla.padEnd(14)} ${todos.length} filas`);
-  }
 
-  const resumen = {
-    generado: new Date().toISOString(),
-    tablas: TABLAS.map((t) => t.tabla),
-    totalFilas: total,
-  };
-  fs.writeFileSync(path.join(carpeta, "_resumen.json"), JSON.stringify(resumen, null, 2), "utf8");
-  console.log(`\nBackup completo en ${carpeta} (${total} filas en total).`);
+    const resumen = {
+      generado: new Date().toISOString(),
+      tablas: TABLAS.map((t) => t.tabla),
+      totalFilas: total,
+    };
+    fs.writeFileSync(path.join(carpeta, "_resumen.json"), JSON.stringify(resumen, null, 2), "utf8");
+
+    // Verificar que el backup este completo antes de darlo por bueno
+    const escritos = fs.readdirSync(carpeta).length;
+    if (escritos !== TABLAS.length + 1) {
+      throw new Error(`Backup incompleto: ${escritos} de ${TABLAS.length + 1} archivos`);
+    }
+
+    console.log(`\nBackup completo en ${carpeta} (${total} filas en total).`);
+  } catch (e) {
+    // No dejar carpetas vacias o parciales que confundan al siguiente respaldo
+    try { fs.rmSync(carpeta, { recursive: true, force: true }); } catch {}
+    throw e;
+  }
 }
 
 main().catch((e) => {
