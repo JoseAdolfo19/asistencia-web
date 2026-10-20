@@ -9,12 +9,14 @@ import type { SessionUser } from "@/lib/session";
 const navItems = [
   { href: "/horario", label: "Horario" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/asistencia", label: "Asistencia", roles: ["Alumno", "Docente", "Tesorera"] as const },
-  { href: "/multas", label: "Multas", roles: ["Alumno", "Docente", "Tesorera"] as const },
+  { href: "/asistencia", label: "Asistencia", roles: ["Alumno", "Docente", "Tesorera", "Administrador"] as const },
+  { href: "/multas", label: "Multas", roles: ["Alumno", "Docente", "Tesorera", "Administrador"] as const },
   { href: "/actividades", label: "Actividades" },
   { href: "/qr", label: "QR", roles: ["Docente"] as const },
   { href: "/marcar", label: "Marcar", roles: ["Alumno", "Tesorera"] as const },
   { href: "/escanear", label: "Escanear", roles: ["Docente"] as const },
+  { href: "/auditoria", label: "Auditoría", roles: ["Administrador"] as const },
+  { href: "/configuracion", label: "Configuración", roles: ["Administrador"] as const },
   { href: "/usuarios", label: "Usuarios", roles: ["Administrador"] as const },
 ];
 

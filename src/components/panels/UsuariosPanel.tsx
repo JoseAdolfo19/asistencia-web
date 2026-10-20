@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { actualizarPerfil, resetearPassword } from "@/lib/admin";
+import { actualizarPerfil, resetearPassword, crearUsuario } from "@/lib/admin";
 import { contrasenaFuerte } from "@/lib/password";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -40,6 +40,18 @@ export default function UsuariosPanel() {
   const [pwForzar, setPwForzar] = useState(true);
   const [pwGuardando, setPwGuardando] = useState(false);
 
+  const [nuevoAbierto, setNuevoAbierto] = useState(false);
+  const [nuevoGuardando, setNuevoGuardando] = useState(false);
+  const [nuevoForm, setNuevoForm] = useState({
+    dni: "",
+    nombres: "",
+    apellidos: "",
+    correo: "",
+    rol: "Alumno",
+    estado: "Activo",
+    contrasena: "",
+  });
+
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -64,6 +76,29 @@ export default function UsuariosPanel() {
   function abrirEditar(u: Usuario) {
     setEditando(u);
     setForm({ nombres: u.nombres, apellidos: u.apellidos, correo: u.correo ?? "", rol: u.rol, estado: u.estado });
+  }
+
+  function abrirNuevo() {
+    setNuevoForm({ dni: "", nombres: "", apellidos: "", correo: "", rol: "Alumno", estado: "Activo", contrasena: "" });
+    setNuevoAbierto(true);
+  }
+
+  async function guardarNuevo() {
+    if (nuevoGuardando) return;
+    setNuevoGuardando(true);
+    setMsg(null);
+    const res = await crearUsuario(nuevoForm);
+    setNuevoGuardando(false);
+    if (!res.ok || !res.id) {
+      setMsg({ ok: false, text: res.error || "Error al crear el usuario." });
+    } else {
+      setMsg({
+        ok: true,
+        text: `Usuario ${res.id} (${nuevoForm.rol}) creado. Deberá cambiar su contraseña en el primer ingreso.`,
+      });
+      setNuevoAbierto(false);
+      cargar();
+    }
   }
 
   async function guardarPerfil() {
@@ -123,6 +158,7 @@ export default function UsuariosPanel() {
           placeholder="Buscar por nombre, código o correo..."
           className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
         />
+        <Button onClick={abrirNuevo}>+ Nuevo usuario</Button>
         <span className="text-sm text-slate-500">{visibles.length} usuario(s)</span>
       </div>
 
@@ -196,6 +232,101 @@ export default function UsuariosPanel() {
             </div>
           )}
         </Paginacion>
+      )}
+
+      {nuevoAbierto && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+            <h2 className="mb-3 font-semibold text-slate-800">Nuevo usuario</h2>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">DNI (8 dígitos)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={8}
+                    value={nuevoForm.dni}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, dni: e.target.value.replace(/\D/g, "") })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">Rol</label>
+                  <select
+                    value={nuevoForm.rol}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, rol: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">Nombres</label>
+                  <input
+                    type="text"
+                    value={nuevoForm.nombres}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, nombres: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">Apellidos</label>
+                  <input
+                    type="text"
+                    value={nuevoForm.apellidos}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, apellidos: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600">
+                  Correo (vacío = DNI@ieslasalle.edu.pe)
+                </label>
+                <input
+                  type="email"
+                  value={nuevoForm.correo}
+                  onChange={(e) => setNuevoForm({ ...nuevoForm, correo: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600">Contraseña inicial</label>
+                <input
+                  type="password"
+                  minLength={10}
+                  value={nuevoForm.contrasena}
+                  onChange={(e) => setNuevoForm({ ...nuevoForm, contrasena: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+                <PasswordStrength value={nuevoForm.contrasena} />
+                <p className="mt-1 text-xs text-slate-500">
+                  Mínimo 10 caracteres con mayúscula, minúscula, número y símbolo. Se pedirá cambiarla en el primer ingreso.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setNuevoAbierto(false)}>Cancelar</Button>
+              <Button
+                onClick={guardarNuevo}
+                disabled={
+                  nuevoGuardando ||
+                  nuevoForm.dni.length !== 8 ||
+                  !nuevoForm.nombres ||
+                  !nuevoForm.apellidos ||
+                  !contrasenaFuerte(nuevoForm.contrasena)
+                }
+              >
+                {nuevoGuardando ? "Creando..." : "Crear usuario"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {editando && (

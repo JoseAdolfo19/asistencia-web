@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export default async function AsistenciaPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.rol === "Administrador") redirect("/dashboard");
 
   return <AsistenciaPanel isAdmin={session.rol !== "Alumno"} rol={session.rol} alumnoId={session.id} />;
 }
