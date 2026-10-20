@@ -186,6 +186,16 @@ export default function MarcarPanel({ nombre }: { nombre: string }) {
           {result.msg}
         </div>
       )}
+
+      <div className="mt-4 rounded-xl bg-white p-4 text-sm shadow">
+        <p className="text-slate-600">
+          ¿Sin cámara o no puedes escanear? También puedes marcar con tu{" "}
+          <a href="/marcar-ubicacion" className="font-semibold text-blue-900 underline">
+            ubicación GPS y tu DNI
+          </a>{" "}
+          (debes estar dentro del instituto).
+        </p>
+      </div>
     </div>
   );
 }

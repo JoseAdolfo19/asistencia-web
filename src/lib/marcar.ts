@@ -7,8 +7,20 @@ import { permitirRateLimit } from "@/lib/rateLimit";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { qrSecret, firmaValida, generarFirmaQR, generarCodigoClase, codigoValido, firmaDiaValida, codigoDiaValido, generarFirmaDia, generarCodigoDia } from "@/lib/qr";
 import { planificarCierre, planificarSubirFaltas, ClaseCierre, FaltaPendiente } from "@/lib/cierre";
+import {
+  INSTITUTO,
+  RADIO_ACEPTACION_M,
+  PRECISION_MAX_M,
+  distanciaHaversineMetros,
+  ventanaUbicacionAbierta,
+  textoVentanasDia,
+} from "@/lib/ubicacion";
 
 export type MarcarResult = { ok: true; estado: string; curso: string } | { ok: false; error: string };
+
+export type MarcarUbicacionResult =
+  | { ok: true; estado: string; curso: string; alumno: string }
+  | { ok: false; error: string };
 
 function puedeEscanear(rol: string): boolean {
   return rol === "Docente" || rol === "Administrador";
@@ -595,18 +607,14 @@ async function marcarPorDia(token: string, alumnoId: string, actorNombre: string
   const t = String(token || "").trim();
   if (!t) return { ok: false, error: "Token vacío" };
 
-  // Procesa cierres automáticos de clases y faltas/tardanzas pendientes antes de marcar
-  await cerrarClasesPendientes();
-
-  const hoyStr = fechaHoy();
   const ahoraMin = aMinutos(horaAhora());
   const secret = qrSecret();
 
   // Determina el tipo de marca según la firma/código de día
   let tipo: "asistencia" | "tardanza" | null = null;
-  if (firmaDiaValida(t, hoyStr, "asistencia", secret) || codigoDiaValido(t, hoyStr, "asistencia", secret)) {
+  if (firmaDiaValida(t, fechaHoy(), "asistencia", secret) || codigoDiaValido(t, fechaHoy(), "asistencia", secret)) {
     tipo = "asistencia";
-  } else if (firmaDiaValida(t, hoyStr, "tardanza", secret) || codigoDiaValido(t, hoyStr, "tardanza", secret)) {
+  } else if (firmaDiaValida(t, fechaHoy(), "tardanza", secret) || codigoDiaValido(t, fechaHoy(), "tardanza", secret)) {
     tipo = "tardanza";
   }
   if (!tipo) {
@@ -622,6 +630,25 @@ async function marcarPorDia(token: string, alumnoId: string, actorNombre: string
         : "El QR de tardanza solo es válido de 9:00 a 10:00.";
     return { ok: false, error: texto };
   }
+
+  return registrarMarcaDia(alumnoId, tipo, actorNombre, "Llegó después de las 8:30 (QR de tardanza)", "");
+}
+
+// Núcleo compartido del modelo POR DÍA. Registra la marca (Presente o Tardanza)
+// asociada a la primera clase obligatoria, con deduplicación, multa de tardanza
+// y auditoría. NO se exporta: solo la llaman funciones que validaron antes la
+// identidad del alumno (QR/código con sesión, o DNI+ubicación).
+async function registrarMarcaDia(
+  alumnoId: string,
+  tipo: "asistencia" | "tardanza",
+  actorNombre: string,
+  motivoTardanza: string,
+  sufijoAuditoria: string
+): Promise<MarcarResult> {
+  // Procesa cierres automáticos de clases y faltas/tardanzas pendientes antes de marcar
+  await ejecutarCierreClases();
+
+  const hoyStr = fechaHoy();
 
   // Curso de referencia: primera clase obligatoria del día
   const base = await cargarBaseDia();
@@ -649,7 +676,7 @@ async function marcarPorDia(token: string, alumnoId: string, actorNombre: string
       if (errores.length > 0) return { ok: false, error: errores[0] };
       await registrarAuditoria(
         "marcar_asistencia",
-        `${actorNombre} subió Falta a Tardanza a ${alumnoId} en ${curso}`
+        `${actorNombre} subió Falta a Tardanza a ${alumnoId} en ${curso}${sufijoAuditoria}`
       );
       return { ok: true, estado: "Tardanza", curso };
     }
@@ -675,7 +702,7 @@ async function marcarPorDia(token: string, alumnoId: string, actorNombre: string
     const { error: errMulta } = await supabaseAdmin.from("multas").insert({
       alumno: alumnoId,
       tipo: "Tardanza",
-      motivo: "Llegó después de las 8:30 (QR de tardanza)",
+      motivo: motivoTardanza,
       monto: base.montoTardanza,
       fecha: hoyStr,
       estado: "Pendiente",
@@ -690,8 +717,81 @@ async function marcarPorDia(token: string, alumnoId: string, actorNombre: string
 
   await registrarAuditoria(
     "marcar_asistencia",
-    `${actorNombre} marcó ${estado} a ${alumnoId} en ${curso}`
+    `${actorNombre} marcó ${estado} a ${alumnoId} en ${curso}${sufijoAuditoria}`
   );
 
   return { ok: true, estado, curso };
+}
+
+// ---------------------------------------------------------------------------
+// Tercera vía de marcación: por UBICACIÓN + DNI (sin sesión).
+// El alumno activa el GPS del celular, ingresa su DNI y el servidor valida:
+//   1. DNI de un alumno activo
+//   2. Ubicación a menos de 100 m del instituto (con señal GPS confiable)
+//   3. Ventana horaria del día:
+//      - Martes:          Presente de 9:30 a 9:40 (sin tardanza)
+//      - Resto (L-V):     Presente de 8:00 a 8:30, Tardanza de 9:00 a 10:00
+// ---------------------------------------------------------------------------
+export async function marcarPorUbicacion(
+  dni: string,
+  lat: number,
+  lng: number,
+  precisionM: number
+): Promise<MarcarUbicacionResult> {
+  const d = String(dni || "").replace(/\D/g, "");
+  if (!/^\d{8}$/.test(d)) return { ok: false, error: "Ingresa tu DNI (8 dígitos)." };
+
+  const la = Number(lat);
+  const lo = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(lo) || (la === 0 && lo === 0)) {
+    return { ok: false, error: "No pudimos leer tu ubicación. Activa el GPS e inténtalo de nuevo." };
+  }
+  const precision = Number(precisionM);
+
+  // Máximo 6 intentos por minuto por DNI (protege contra spam)
+  if (!(await permitirRateLimit(`ubicacion:${d}`, 6, 60_000))) {
+    return { ok: false, error: "Demasiados intentos. Espera un momento." };
+  }
+
+  // El DNI identifica al alumno; la cuenta debe estar activa y habilitada
+  const { data: fila } = await supabaseAdmin
+    .from("alumnos")
+    .select("id,nombres,apellidos,rol,estado")
+    .eq("dni", d)
+    .limit(1);
+  const a = fila?.[0];
+  if (!a || a.estado !== "Activo" || !esAlumno(a.rol) || !esAlumnoRegistrado(a.id)) {
+    return { ok: false, error: "No hay un alumno activo con ese DNI." };
+  }
+
+  // Validación de ubicación
+  const dist = distanciaHaversineMetros(la, lo, INSTITUTO.lat, INSTITUTO.lng);
+  if (Number.isFinite(precision) && precision > PRECISION_MAX_M) {
+    return {
+      ok: false,
+      error: `Tu señal GPS no es precisa (±${Math.round(precision)} m). Sal a un lugar despejado y vuelve a activar la ubicación.`,
+    };
+  }
+  if (dist > RADIO_ACEPTACION_M) {
+    return {
+      ok: false,
+      error: `Estás a ${Math.round(dist)} m del instituto. Acércate a menos de ${RADIO_ACEPTACION_M} m para marcar tu asistencia.`,
+    };
+  }
+
+  // Validación de ventana horaria según el día
+  const dia = diaHoy();
+  const ahoraMin = aMinutos(horaAhora());
+  const ventana = ventanaUbicacionAbierta(dia, ahoraMin);
+  if (!ventana) return { ok: false, error: textoVentanasDia(dia) };
+
+  const res = await registrarMarcaDia(
+    a.id,
+    ventana.tipo,
+    `${a.nombres} ${a.apellidos}`,
+    "Llegó tarde (marcado por ubicación)",
+    " por ubicación (DNI)"
+  );
+  if (!res.ok) return res;
+  return { ok: true, estado: res.estado, curso: res.curso, alumno: `${a.nombres} ${a.apellidos}` };
 }
