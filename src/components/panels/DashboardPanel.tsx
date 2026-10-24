@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { resumirDashboard } from "@/lib/dashboard";
 import { fechaHoy, formatFechaPeru } from "@/lib/estado";
+import ErrorState from "@/components/ui/ErrorState";
+import Skeleton from "@/components/ui/Skeleton";
 import {
   Bar,
   BarChart,
@@ -36,72 +39,59 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
   const [porDia, setPorDia] = useState<PorDia[]>([]);
   const [multas, setMultas] = useState<{ pendiente: number; pagado: number; montoPendiente: number; montoPagado: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reintento, setReintento] = useState(0);
 
   useEffect(() => {
+    let activo = true;
+
     const fechaDesde = formatFechaPeru(new Date(Date.now() - 45 * 24 * 60 * 60 * 1000));
 
-    let query = supabase.from("asistencia").select("*").gte("fecha", fechaDesde);
-    let queryMultas = supabase.from("multas").select("*").gte("fecha", fechaDesde);
+    let query = supabase
+      .from("asistencia")
+      .select("fecha,curso,estado,justificada")
+      .gte("fecha", fechaDesde);
+    let queryMultas = supabase.from("multas").select("estado,monto").gte("fecha", fechaDesde);
 
     if (esAlumno) {
       query = query.eq("alumno", alumnoId);
       queryMultas = queryMultas.eq("alumno", alumnoId);
     }
 
-    Promise.all([query, queryMultas]).then(([{ data: asis }, { data: ms }]) => {
-      const regs = (asis ?? []) as { fecha: string; curso: string; estado: string; justificada?: boolean }[];
-      const filasMultas = (ms ?? []) as { estado: string; monto: number }[];
+    async function cargar() {
+      setLoading(true);
+      setError(false);
 
-      // Estado hoy (solo Presente / Tardanza / Falta)
-      const hoy = fechaHoy();
-      const hoyRegs = regs.filter((r) => r.fecha === hoy);
-      const contar = (arr: typeof hoyRegs) =>
-        ["Presente", "Tardanza", "Falta"]
-          .map((estado) => ({ estado, total: arr.filter((r) => r.estado === estado).length }))
-          .filter((c) => c.total > 0);
-      setEstadoHoy(contar(hoyRegs));
+      try {
+        const [resultadoAsistencia, resultadoMultas] = await Promise.all([query, queryMultas]);
+        if (resultadoAsistencia.error || resultadoMultas.error) {
+          if (activo) setError(true);
+          return;
+        }
 
-      // Por curso (todos los registros)
-      const porCursoMap = new Map<string, { Presente: number; Tardanza: number; Falta: number; Justificada: number }>();
-      for (const r of regs) {
-        const c = porCursoMap.get(r.curso) ?? { Presente: 0, Tardanza: 0, Falta: 0, Justificada: 0 };
-        if (r.justificada) c.Justificada++;
-        else if (r.estado === "Presente") c.Presente++;
-        else if (r.estado === "Tardanza") c.Tardanza++;
-        else if (r.estado === "Falta") c.Falta++;
-        porCursoMap.set(r.curso, c);
+        const resumen = resumirDashboard(
+          resultadoAsistencia.data ?? [],
+          resultadoMultas.data ?? [],
+          fechaHoy()
+        );
+        if (!activo) return;
+
+        setEstadoHoy(resumen.estadoHoy);
+        setPorCurso(resumen.porCurso);
+        setPorDia(resumen.porDia);
+        setMultas(resumen.multas);
+      } catch {
+        if (activo) setError(true);
+      } finally {
+        if (activo) setLoading(false);
       }
-      setPorCurso([...porCursoMap.entries()].map(([curso, v]) => ({ curso, ...v })));
+    }
 
-      // Por día (últimos 7 días)
-      const dias = new Set(regs.map((r) => r.fecha));
-      const ultimos = [...dias].sort().slice(-7);
-      setPorDia(
-        ultimos.map((fecha) => {
-          const delDia = regs.filter((r) => r.fecha === fecha);
-          return {
-            fecha: fecha.slice(5),
-            Presente: delDia.filter((r) => r.estado === "Presente").length,
-            Tardanza: delDia.filter((r) => r.estado === "Tardanza").length,
-            Falta: delDia.filter((r) => r.estado === "Falta").length,
-            Justificada: delDia.filter((r) => r.justificada).length,
-          };
-        })
-      );
-
-      // Multas
-      const pendiente = filasMultas.filter((m) => m.estado !== "Pagado" && m.estado !== "Anulada");
-      const pagado = filasMultas.filter((m) => m.estado === "Pagado");
-      setMultas({
-        pendiente: pendiente.length,
-        pagado: pagado.length,
-        montoPendiente: pendiente.reduce((a, m) => a + Number(m.monto ?? 0), 0),
-        montoPagado: pagado.reduce((a, m) => a + Number(m.monto ?? 0), 0),
-      });
-
-      setLoading(false);
-    });
-  }, [esAlumno, alumnoId]);
+    void cargar();
+    return () => {
+      activo = false;
+    };
+  }, [esAlumno, alumnoId, reintento]);
 
   const totalHoy = estadoHoy.reduce((a, c) => a + c.total, 0);
 
@@ -113,7 +103,22 @@ export default function DashboardPanel({ esAlumno, alumnoId }: { esAlumno: boole
       </p>
 
       {loading ? (
-        <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">Cargando...</p>
+        <div className="mt-4 space-y-4" aria-label="Cargando resumen">
+          <Skeleton className="h-24 w-full" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Skeleton className="h-72" />
+            <Skeleton className="h-72" />
+          </div>
+        </div>
+      ) : error ? (
+        <div className="mt-4">
+          <ErrorState mensaje="No se pudo cargar el resumen." onReintentar={() => setReintento((v) => v + 1)} />
+        </div>
       ) : (
         <div className="mt-4 space-y-4">
           <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
